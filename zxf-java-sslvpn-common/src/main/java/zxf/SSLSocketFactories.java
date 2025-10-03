@@ -26,7 +26,7 @@ public class SSLSocketFactories {
             return sslServerSocketFactory;
         }
         // 启用 SSL 调试日志
-        System.setProperty("javax.net.debug", "all");
+        //System.setProperty("javax.net.debug", "all");
 
         //Key-Store
         KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -57,7 +57,7 @@ public class SSLSocketFactories {
         }
 
         // 启用 SSL 调试日志
-        System.setProperty("javax.net.debug", "all");
+        //System.setProperty("javax.net.debug", "all");
 
         //Key-Store
         KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());

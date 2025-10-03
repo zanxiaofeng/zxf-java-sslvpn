@@ -22,8 +22,8 @@ public record DataForwarder(InputStream input, OutputStream output) implements R
                 output.write(buffer, 0, bytesRead);
                 output.flush();
             }
-        } catch (IOException e) {
-            // 连接关闭是正常的
+        } catch (IOException ex) {
+            log.error("Exception when forward data {}", ex.getMessage(), ex);
         }
     }
 }

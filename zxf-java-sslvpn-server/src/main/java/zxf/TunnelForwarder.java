@@ -20,8 +20,8 @@ public record TunnelForwarder(SSLSocket clientSocket, Socket targetSocket) imple
             OutputStream targetOutput = targetSocket.getOutputStream();
 
             // 启动双向数据转发
-            Thread clientToTarget = new Thread(new DataForwarder(clientInput, targetOutput));
-            Thread targetToClient = new Thread(new DataForwarder(targetInput, clientOutput));
+            Thread clientToTarget = new Thread(new DataForwarder(clientInput, targetOutput), clientSocket.getRemoteSocketAddress().toString() + "-" + targetSocket.getRemoteSocketAddress());
+            Thread targetToClient = new Thread(new DataForwarder(targetInput, clientOutput), targetSocket.getRemoteSocketAddress().toString() + "-" + clientSocket.getRemoteSocketAddress());
 
             clientToTarget.start();
             targetToClient.start();
@@ -29,13 +29,13 @@ public record TunnelForwarder(SSLSocket clientSocket, Socket targetSocket) imple
             clientToTarget.join();
             targetToClient.join();
 
-        } catch (Exception e) {
-            e.printStackTrace(System.out);
+        } catch (Exception ex) {
+            log.info("Exception when start data forward {}", ex.getMessage(), ex);
         } finally {
             try {
                 targetSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace(System.out);
+            } catch (IOException ex) {
+                log.info("Exception when close target socket {}", ex.getMessage(), ex);
             }
         }
     }

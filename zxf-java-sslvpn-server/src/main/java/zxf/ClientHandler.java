@@ -65,7 +65,8 @@ public record ClientHandler(SSLSocket clientSocket) implements Runnable {
 
             // 启动数据转发线程
             new Thread(new TunnelForwarder(clientSocket, targetSocket)).start();
-        } catch (Exception e) {
+        } catch (Exception ex) {
+            log.error("Exception when handleConnectionRequest: {}", ex.getMessage(), ex);
             // 发送连接失败响应
             clientOutput.writeByte(0x01); // 连接响应
             clientOutput.writeInt(0); // 失败

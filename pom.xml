@@ -12,6 +12,7 @@
         <module>zxf-java-sslvpn-common</module>
         <module>zxf-java-sslvpn-client</module>
         <module>zxf-java-sslvpn-server</module>
+        <module>zxf-java-sslvpn-test</module>
     </modules>
 
     <properties>
@@ -26,6 +27,11 @@
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>1.5.18</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>33.5.0-jre</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

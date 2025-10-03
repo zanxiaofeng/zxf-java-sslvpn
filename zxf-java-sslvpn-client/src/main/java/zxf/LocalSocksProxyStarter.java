@@ -1,35 +1,36 @@
 package zxf;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import lombok.extern.slf4j.Slf4j;
+
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.*;
 
+@Slf4j
 public class LocalSocksProxyStarter {
     private static final int LOCAL_SOCKS_PORT = 1080;
 
-    public static void main(String[] args) {
-        try {
-            SSLVPNClient client = new SSLVPNClient();
-            // 启动本地SOCKS代理服务器
-            startLocalSocksProxy(client.connectToVPNServer());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public static void main(String[] args) throws Exception {
+        SSLVPNClient client = new SSLVPNClient();
+        // 启动本地SOCKS代理服务器
+        startLocalSocksProxy(client.connectToVPNServer());
     }
 
     private static void startLocalSocksProxy(SSLSocket vpnSocket) throws IOException {
         ServerSocket localServerSocket = new ServerSocket(LOCAL_SOCKS_PORT);
-        System.out.println("SOCKS proxy started on port " + LOCAL_SOCKS_PORT);
+        log.info("SOCKS proxy started on port {}", LOCAL_SOCKS_PORT);
 
-        ExecutorService threadPool = Executors.newCachedThreadPool();
+        ExecutorService threadPool = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("socks-processor-%d").build());
 
         while (true) {
             try {
                 Socket clientSocket = localServerSocket.accept();
+                log.info("New client connected:  {}, {}", clientSocket.getLocalSocketAddress(), clientSocket.getRemoteSocketAddress());
                 threadPool.execute(new SocksHandler(clientSocket, vpnSocket));
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (Exception ex) {
+                log.error("Exception when wait for client connect {}", ex.getMessage(), ex);
             }
         }
     }
@@ -78,7 +79,7 @@ public class LocalSocksProxyStarter {
                     throw new IOException("Unsupported address type");
                 }
 
-                System.out.println("SOCKS request: " + targetHost + ":" + targetPort);
+                log.info("SOCKS request to {}:{}", targetHost, targetPort);
 
                 // 通过VPN隧道连接目标
                 DataOutputStream vpnOutput = new DataOutputStream(vpnSocket.getOutputStream());
@@ -114,12 +115,12 @@ public class LocalSocksProxyStarter {
                     clientSocket.close();
                 }
 
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (Exception ex) {
+                log.error("Exception when forward data {}", ex.getMessage(), ex);
                 try {
                     clientSocket.close();
-                } catch (IOException ex) {
-                    ex.printStackTrace();
+                } catch (IOException e) {
+                    log.error("Exception when close client socket {}", e.getMessage(), e);
                 }
             }
         }
@@ -132,14 +133,14 @@ public class LocalSocksProxyStarter {
                 OutputStream vpnOutput = vpnSocket.getOutputStream();
 
                 // 启动双向数据转发
-                Thread clientToVpn = new Thread(new DataForwarder(clientInput, vpnOutput));
-                Thread vpnToClient = new Thread(new DataForwarder(vpnInput, clientOutput));
+                Thread clientToVpn = new Thread(new DataForwarder(clientInput, vpnOutput), clientSocket.getRemoteSocketAddress().toString() + "-" + vpnSocket.getRemoteSocketAddress());
+                Thread vpnToClient = new Thread(new DataForwarder(vpnInput, clientOutput), vpnSocket.getRemoteSocketAddress().toString() + "-" + clientSocket.getRemoteSocketAddress());
 
                 clientToVpn.start();
                 vpnToClient.start();
 
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (IOException ex) {
+                log.error("Exception when start data forward {}", ex.getMessage(), ex);
             }
         }
     }
