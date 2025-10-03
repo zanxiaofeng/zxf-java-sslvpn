@@ -52,10 +52,6 @@ public record ClientHandler(SSLSocket clientSocket) implements Runnable {
         }
     }
 
-    private void handleRequest(DataInputStream input, DataOutputStream output) throws IOException {
-        // 读取请求头
-    }
-
     private void handleConnectionRequest(DataOutputStream clientOutput, byte[] targetHost, int targetPort) throws IOException {
         log.info("handleConnectionRequest, {}:{}", new String(targetHost), targetPort);
         try {

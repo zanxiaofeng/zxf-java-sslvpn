@@ -1,29 +1,35 @@
 package zxf;
 
-import lombok.extern.slf4j.Slf4j;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Socket;
 
-@Slf4j
-public record DataForwarder(InputStream input, OutputStream output) implements Runnable {
-    private static final int BUFFER_SIZE = 8192;
+public record DataForwarder(Socket source, Socket target) {
 
-    @Override
-    public void run() {
-        log.info("run");
-
-        byte[] buffer = new byte[BUFFER_SIZE];
-
-        try {
-            int bytesRead;
-            while ((bytesRead = input.read(buffer)) != -1) {
-                output.write(buffer, 0, bytesRead);
-                output.flush();
+    public Thread start() {
+        Thread clientToTarget = new Thread(() -> {
+            try {
+                InputStream clientInput = source.getInputStream();
+                OutputStream targetOutput = target.getOutputStream();
+                pipeStreams(clientInput, targetOutput);
+            } catch (IOException e) {
+                // 连接关闭时正常结束
+            } finally {
+                SocketUtils.closeQuietly(target);
             }
-        } catch (IOException ex) {
-            log.error("Exception when forward data {}", ex.getMessage(), ex);
+        }, source.getRemoteSocketAddress().toString() + "-" + target.getRemoteSocketAddress());
+
+        clientToTarget.start();
+        return clientToTarget;
+    }
+
+    private void pipeStreams(InputStream input, OutputStream output) throws IOException {
+        byte[] buffer = new byte[8192];
+        int bytesRead;
+        while ((bytesRead = input.read(buffer)) != -1) {
+            output.write(buffer, 0, bytesRead);
+            output.flush();
         }
     }
 }
