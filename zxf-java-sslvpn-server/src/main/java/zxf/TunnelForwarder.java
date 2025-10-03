@@ -1,19 +1,15 @@
 package zxf;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 
-public class TunnelForwarder implements Runnable {
-    private final SSLSocket clientSocket;
-    private final Socket targetSocket;
-
-    public TunnelForwarder(SSLSocket clientSocket, Socket targetSocket) {
-        this.clientSocket = clientSocket;
-        this.targetSocket = targetSocket;
-    }
+@Slf4j
+public record TunnelForwarder(SSLSocket clientSocket, Socket targetSocket) implements Runnable {
 
     @Override
     public void run() {

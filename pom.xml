@@ -9,6 +9,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>zxf-java-sslvpn-common</module>
         <module>zxf-java-sslvpn-client</module>
         <module>zxf-java-sslvpn-server</module>
     </modules>
@@ -19,4 +20,18 @@
         <!-- For Java 9+ you might also want to set release -->
         <maven.compiler.release>17</maven.compiler.release>
     </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.5.18</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.24</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
 </project>
