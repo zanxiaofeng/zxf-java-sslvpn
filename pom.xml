@@ -9,8 +9,8 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>zxf-java-sslvpn-gateway</module>
         <module>zxf-java-sslvpn-client</module>
+        <module>zxf-java-sslvpn-server</module>
     </modules>
 
     <properties>

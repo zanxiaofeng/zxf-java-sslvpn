@@ -1,11 +1,18 @@
+package zxf;
+
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.*;
 import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.util.concurrent.*;
 
 public class SSLVPNClient {
     private static final String VPN_SERVER_HOST = "localhost";
+    private static String KEY_STORE_PATH = "keystore/keystore-client.jks";
+    private static String KEY_STORE_PASS_PHRASE = "changeit";
+    private static String TRUST_STORE_PATH = "keystore/truststore-client.jks";
+    private static String TRUST_STORE_PASS_PHRASE = "changeit";
     private static final int VPN_SERVER_PORT = 8443;
     private static final int LOCAL_SOCKS_PORT = 1080;
 
@@ -28,24 +35,27 @@ public class SSLVPNClient {
     }
 
     private SSLContext createSSLContext() throws Exception {
-        // 信任所有证书（仅用于测试）
-        TrustManager[] trustAllCerts = new TrustManager[] {
-                new X509TrustManager() {
-                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                        return null;
-                    }
-                    public void checkClientTrusted(
-                            java.security.cert.X509Certificate[] certs, String authType) {
-                    }
-                    public void checkServerTrusted(
-                            java.security.cert.X509Certificate[] certs, String authType) {
-                    }
-                }
-        };
+        // 启用 SSL 调试日志
+        System.setProperty("javax.net.debug", "all");
 
-        SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+        //Key-Store
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        try (InputStream trustStoreInputStream = SSLVPNClient.class.getClassLoader().getResourceAsStream(KEY_STORE_PATH)) {
+            KeyStore keyStore = KeyStore.getInstance("JKS");
+            keyStore.load(trustStoreInputStream, KEY_STORE_PASS_PHRASE.toCharArray());
+            keyManagerFactory.init(keyStore, KEY_STORE_PASS_PHRASE.toCharArray());
+        }
 
+        //Trust-Store
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        try (InputStream trustStoreInputStream = SSLVPNClient.class.getClassLoader().getResourceAsStream(TRUST_STORE_PATH)) {
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            trustStore.load(trustStoreInputStream, TRUST_STORE_PASS_PHRASE.toCharArray());
+            trustManagerFactory.init(trustStore);
+        }
+
+        SSLContext sslContext = SSLContext.getInstance("SSL");
+        sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
         return sslContext;
     }
 
