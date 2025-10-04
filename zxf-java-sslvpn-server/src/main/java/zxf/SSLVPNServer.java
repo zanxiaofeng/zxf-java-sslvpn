@@ -20,7 +20,7 @@ public class SSLVPNServer {
         log.info("SSL VPN Gateway started on port {}", SERVER_PORT);
 
         ExecutorService threadPool = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("vpn-server-processor-%d").build());
-        while (true) {
+        while (!Thread.currentThread().isInterrupted()) {
             try {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
                 log.info("New client connected:  {}, {}, {}", clientSocket.getLocalSocketAddress(), clientSocket.getRemoteSocketAddress(), clientSocket.getSession());

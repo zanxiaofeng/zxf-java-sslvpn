@@ -2,34 +2,32 @@ package zxf.socks;
 
 import lombok.extern.slf4j.Slf4j;
 import zxf.DataForwarder;
+import zxf.SSLVPNClient;
 import zxf.SocketUtils;
 
-import javax.net.ssl.SSLSocket;
 import java.io.*;
 import java.net.*;
 
 @Slf4j
 public class Socks5Handler implements Runnable {
     private final Socket clientSocket;
-    private final SSLSocket vpnSocket;
 
-    public Socks5Handler(Socket clientSocket, SSLSocket vpnSocket) {
+    public Socks5Handler(Socket clientSocket) {
         this.clientSocket = clientSocket;
-        this.vpnSocket = vpnSocket;
     }
 
     @Override
     public void run() {
         try {
             handleClient();
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             log.error("SOCKS proxy error on process {}", ex.getMessage(), ex);
         } finally {
             SocketUtils.closeQuietly(clientSocket);
         }
     }
 
-    private void handleClient() throws IOException {
+    private void handleClient() throws Exception {
         DataInputStream clientInput = new DataInputStream(clientSocket.getInputStream());
         DataOutputStream clientOutput = new DataOutputStream(clientSocket.getOutputStream());
 
@@ -79,7 +77,7 @@ public class Socks5Handler implements Runnable {
         return true;
     }
 
-    private void handleRequest(DataInputStream input, DataOutputStream output) throws IOException {
+    private void handleRequest(DataInputStream input, DataOutputStream output) throws Exception {
         // 读取请求头
         int version = input.readUnsignedByte();
         int command = input.readUnsignedByte();
@@ -128,15 +126,14 @@ public class Socks5Handler implements Runnable {
         log.info("SOCKS proxy process, connect to {}:{}", targetHost, targetPort);
 
         // 连接到目标服务器
-        try (Socket targetSocket = new Socket(targetHost, targetPort)) {
+        try (Socket targetSocket = new SSLVPNClient().connectToVPNServer(targetHost, targetPort)) {
             // 发送成功响应
             sendSuccessResponse(output, targetSocket.getLocalAddress(), targetSocket.getLocalPort());
 
             // 开始数据转发
-            startTunnel(clientSocket, targetSocket);
-
-        } catch (IOException e) {
-            System.err.println("连接目标失败: " + e.getMessage());
+            SocketUtils.startTunnel(clientSocket, targetSocket);
+        } catch (Exception ex) {
+            log.error("Exception when connect to target {}", ex.getMessage(), ex);
             sendErrorResponse(output, 0x05); // 连接被拒绝
         }
     }
@@ -166,19 +163,5 @@ public class Socks5Handler implements Runnable {
         output.write(new byte[4]); // 空IP地址
         output.writeShort(0); // 空端口
         output.flush();
-    }
-
-    private void startTunnel(Socket client, Socket target) {
-        // 客户端到目标服务器的数据转发
-        Thread clientToTarget = new DataForwarder(client, target).start();
-        // 目标服务器到客户端的数据转发
-        Thread targetToClient = new DataForwarder(target, client).start();
-
-        try {
-            clientToTarget.join();
-            targetToClient.join();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
     }
 }

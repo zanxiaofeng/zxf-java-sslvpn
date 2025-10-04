@@ -11,7 +11,7 @@ public class AuthenticatedSocks5Handler extends Socks5Handler {
     private final String password;
 
     public AuthenticatedSocks5Handler(Socket clientSocket, String username, String password) {
-        super(clientSocket, vpnSocket);
+        super(clientSocket);
         this.username = username;
         this.password = password;
     }
