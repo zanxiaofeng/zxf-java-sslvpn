@@ -13,7 +13,6 @@
     <artifactId>zxf-java-sslvpn-echo-server</artifactId>
 
     <dependencies>
-
         <dependency>
             <groupId>zxf</groupId>
             <artifactId>zxf-java-sslvpn-common</artifactId>

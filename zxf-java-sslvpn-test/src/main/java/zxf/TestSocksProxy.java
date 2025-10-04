@@ -1,7 +1,10 @@
 package zxf;
 
+import org.apache.commons.io.IOUtils;
+
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 public class TestSocksProxy {
@@ -25,12 +28,13 @@ public class TestSocksProxy {
         Proxy proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress("localhost", 1080));
 
         // Open a connection using the proxy
-        URL url = new URL("https://www.163.com");
+        URL url = new URL("https://www.sina.com");
         URLConnection connection = url.openConnection(proxy);
 
         // Read data from the connection
         try (InputStream in = connection.getInputStream()) {
-            // Process the input stream
+            String result = IOUtils.toString(in, StandardCharsets.UTF_8);
+            System.out.println(result);
         }
     }
 

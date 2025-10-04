@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>zxf-java-sslvpn-echo-server</artifactId>
+
     <dependencies>
         <dependency>
             <groupId>zxf</groupId>
