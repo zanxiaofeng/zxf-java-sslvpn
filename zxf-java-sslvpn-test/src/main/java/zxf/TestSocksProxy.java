@@ -2,20 +2,24 @@ package zxf;
 
 import java.io.*;
 import java.net.*;
+import java.time.LocalDateTime;
 
 public class TestSocksProxy {
     public static void main(String[] args) throws Exception {
-        testTCPWithSocksProxy();
+        //testTCPWithSocksProxy();
+
+
+        testHttpWithSocksProxy();
     }
 
     private static void testHttpWithSocksProxy() throws Exception {
-        // Set up the authenticator
-        Authenticator.setDefault(new Authenticator() {
-            @Override
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication("username", "password".toCharArray());
-            }
-        });
+//        // Set up the authenticator
+//        Authenticator.setDefault(new Authenticator() {
+//            @Override
+//            protected PasswordAuthentication getPasswordAuthentication() {
+//                return new PasswordAuthentication("username", "password".toCharArray());
+//            }
+//        });
 
         // Create a SOCKS proxy object
         Proxy proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress("localhost", 1080));
@@ -44,7 +48,7 @@ public class TestSocksProxy {
                 DataInputStream clientInput = new DataInputStream(socket.getInputStream());
                 DataOutputStream clientOutput = new DataOutputStream(socket.getOutputStream());
 
-                byte[] data = "Hello".getBytes();
+                byte[] data = LocalDateTime.now().toString().getBytes();
 
                 while (!Thread.currentThread().isInterrupted()) {
                     clientOutput.writeInt(data.length);
@@ -54,8 +58,11 @@ public class TestSocksProxy {
                     int count = clientInput.readInt();
                     byte[] dataR = new byte[count];
                     clientInput.readFully(dataR);
+                    System.out.println("Received: " + new String(dataR));
+
+                    Thread.currentThread().sleep(30000);
                 }
-            } catch (IOException e) {
+            } catch (IOException | InterruptedException e) {
                 // 连接关闭时正常结束
             } finally {
                 SocketUtils.closeQuietly(socket);
@@ -65,5 +72,4 @@ public class TestSocksProxy {
         socketThread.start();
         socketThread.join();
     }
-
 }

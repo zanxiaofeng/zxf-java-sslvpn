@@ -14,7 +14,7 @@ public class SocketUtils {
         return String.format("%s -> %s : %s", socket.getLocalSocketAddress(), socket.getRemoteSocketAddress(), socket.getSession());
     }
 
-    public static void startTunnel(Socket client, Socket target) {
+    public static void startTunnel(Socket client, Socket target) throws Exception {
         // 客户端到目标服务器的数据转发
         Thread clientToTarget = new DataForwarder(client, target).start();
         // 目标服务器到客户端的数据转发

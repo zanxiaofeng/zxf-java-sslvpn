@@ -10,7 +10,7 @@ import java.util.concurrent.*;
 
 @Slf4j
 public class Socks5ProxyServer {
-    private static final int LOCAL_SOCKS_PORT = 1080;
+    private static final int SERVER_PORT = 1080;
     private final ExecutorService executorService;
 
     public Socks5ProxyServer() {
@@ -18,8 +18,8 @@ public class Socks5ProxyServer {
     }
 
     public void start() {
-        try (ServerSocket serverSocket = new ServerSocket(LOCAL_SOCKS_PORT)) {
-            log.info("SOCKS proxy, Started on port {}", LOCAL_SOCKS_PORT);
+        try (ServerSocket serverSocket = new ServerSocket(SERVER_PORT)) {
+            log.info("SOCKS proxy, Started on port {}", SERVER_PORT);
 
             while (!Thread.currentThread().isInterrupted()) {
                 Socket clientSocket = serverSocket.accept();

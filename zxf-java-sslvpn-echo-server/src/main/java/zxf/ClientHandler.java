@@ -32,11 +32,12 @@ public record ClientHandler(Socket clientSocket) implements Runnable {
 
 
     private void handleRequest(DataInputStream clientInput, DataOutputStream clientOutput) throws IOException {
-        log.info("TCP echo server - Client handler({}), Handle request start", SocketUtils.socketInfo(clientSocket));
+        log.info("TCP echo server - Client handler({}), Handle request, start", SocketUtils.socketInfo(clientSocket));
         while (!Thread.currentThread().isInterrupted()) {
             int count = clientInput.readInt();
             byte[] data = new byte[count];
             clientInput.readFully(data);
+            log.info("TCP echo server - Client handler({}), Handle request, {}", SocketUtils.socketInfo(clientSocket), new String(data));
             sendResponse(clientOutput, data);
         }
     }
