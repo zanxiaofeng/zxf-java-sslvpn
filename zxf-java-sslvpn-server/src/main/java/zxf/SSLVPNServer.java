@@ -12,23 +12,28 @@ import java.util.concurrent.*;
 @Slf4j
 public class SSLVPNServer {
     private static final int SERVER_PORT = 8443;
+    private final ExecutorService executorService;
+
+    public SSLVPNServer() {
+        this.executorService = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("vpn-server-processor-%d").build());
+    }
 
     public void start() throws Exception {
         SSLServerSocketFactory sslServerSocketFactory = SSLSocketFactories.sslServerSocketFactory();
-        SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(SERVER_PORT);
-        serverSocket.setNeedClientAuth(false); // 不需要客户端证书
-        log.info("SSL VPN Gateway started on port {}", SERVER_PORT);
+        try (SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(SERVER_PORT)) {
+            serverSocket.setNeedClientAuth(false); // 不需要客户端证书
+            log.info("SSL VPN gateway started on port {}", SERVER_PORT);
 
-        ExecutorService threadPool = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("vpn-server-processor-%d").build());
-        while (!Thread.currentThread().isInterrupted()) {
-            try {
+            while (!Thread.currentThread().isInterrupted()) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                log.info("New client connected:  {}, {}, {}", clientSocket.getLocalSocketAddress(), clientSocket.getRemoteSocketAddress(), clientSocket.getSession());
+                log.info("SSL VPN gateway, New client connected:  {}, {}, {}", clientSocket.getLocalSocketAddress(), clientSocket.getRemoteSocketAddress(), clientSocket.getSession());
                 // 为每个客户端创建新线程
-                threadPool.execute(new ClientHandler(clientSocket));
-            } catch (Exception ex) {
-                log.info("Exception when wart for client connection {}", ex.getMessage(), ex);
+                executorService.submit(new ClientHandler(clientSocket));
             }
+        } catch (Exception ex) {
+            log.error("SSL VPN gateway  error {}", ex.getMessage(), ex);
+        } finally {
+            executorService.shutdown();
         }
     }
 
