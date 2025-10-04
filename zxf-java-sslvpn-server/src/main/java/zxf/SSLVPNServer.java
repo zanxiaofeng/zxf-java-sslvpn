@@ -37,7 +37,6 @@ public class SSLVPNServer {
         }
     }
 
-
     public static void main(String[] args) throws Exception {
         new SSLVPNServer().start();
     }

@@ -9,17 +9,16 @@ import java.util.concurrent.*;
 
 @Slf4j
 public class Socks5ProxyServer {
-    private final int port;
+    private static final int LOCAL_SOCKS_PORT = 1080;
     private final ExecutorService executorService;
 
-    public Socks5ProxyServer(int port) {
-        this.port = port;
+    public Socks5ProxyServer() {
         this.executorService = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("socks-processor-%d").build());
     }
 
     public void start() {
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            log.info("SOCKS proxy started on port {}", port);
+        try (ServerSocket serverSocket = new ServerSocket(LOCAL_SOCKS_PORT)) {
+            log.info("SOCKS proxy started on port {}", LOCAL_SOCKS_PORT);
 
             while (!Thread.currentThread().isInterrupted()) {
                 Socket clientSocket = serverSocket.accept();
@@ -31,5 +30,9 @@ public class Socks5ProxyServer {
         } finally {
             executorService.shutdown();
         }
+    }
+
+    public static void main(String[] args) throws Exception {
+        new Socks5ProxyServer().start();
     }
 }
