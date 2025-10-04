@@ -31,19 +31,14 @@ public class SSLVPNServer {
                 executorService.submit(new ClientHandler(clientSocket));
             }
         } catch (Exception ex) {
-            log.error("SSL VPN gateway  error {}", ex.getMessage(), ex);
+            log.error("SSL VPN gateway error {}", ex.getMessage(), ex);
         } finally {
             executorService.shutdown();
         }
     }
 
 
-    public static void main(String[] args) {
-        try {
-            SSLVPNServer server = new SSLVPNServer();
-            server.start();
-        } catch (Exception ex) {
-            log.error("Exception when start VPN Gateway {}", ex.getMessage(), ex);
-        }
+    public static void main(String[] args) throws Exception {
+        new SSLVPNServer().start();
     }
 }
