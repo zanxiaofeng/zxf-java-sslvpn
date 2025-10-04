@@ -18,11 +18,13 @@ public class Socks5Handler implements Runnable {
     @Override
     public void run() {
         try {
+            log.info("SOCKS proxy - Client handler({}), Processing start", SocketUtils.socketInfo(clientSocket));
             handleClient();
         } catch (Exception ex) {
-            log.error("SOCKS proxy error on process {}", ex.getMessage(), ex);
+            log.error("SOCKS proxy - Client handler({}), Processing error {}", SocketUtils.socketInfo(clientSocket), ex.getMessage(), ex);
         } finally {
             SocketUtils.closeQuietly(clientSocket);
+            log.info("SOCKS proxy - Client handler({}), Processing end", SocketUtils.socketInfo(clientSocket));
         }
     }
 
@@ -40,12 +42,14 @@ public class Socks5Handler implements Runnable {
     }
 
     protected boolean handleAuthentication(DataInputStream input, DataOutputStream output) throws IOException {
+        log.info("SOCKS proxy - Client handler({}), Handle authentication start", SocketUtils.socketInfo(clientSocket));
+
         // 读取版本和方法数量
         int version = input.readUnsignedByte();
         int methodCount = input.readUnsignedByte();
 
         if (version != 0x05) {
-            log.error("SOCKS proxy error on process: unsupported SOCKS version {}", version);
+            log.error("SOCKS proxy - Client handler({}), Handle authentication error, unsupported SOCKS version {}", SocketUtils.socketInfo(clientSocket), version);
             return false;
         }
 
@@ -77,6 +81,7 @@ public class Socks5Handler implements Runnable {
     }
 
     private void handleRequest(DataInputStream input, DataOutputStream output) throws Exception {
+        log.info("SOCKS proxy - Client handler({}), Handle request start", SocketUtils.socketInfo(clientSocket));
         // 读取请求头
         int version = input.readUnsignedByte();
         int command = input.readUnsignedByte();
@@ -84,12 +89,14 @@ public class Socks5Handler implements Runnable {
         int addressType = input.readUnsignedByte();
 
         if (version != 0x05) {
+            log.error("SOCKS proxy - Client handler({}), Handle request error, unsupported SOCKS version {}", SocketUtils.socketInfo(clientSocket), version);
             sendErrorResponse(output, 0x01); // 常规SOCKS服务器故障
             return;
         }
 
         // 只支持CONNECT命令 (0x01)
         if (command != 0x01) {
+            log.error("SOCKS proxy - Client handler({}), Handle request error, unsupported SOCKS command {}", SocketUtils.socketInfo(clientSocket), command);
             sendErrorResponse(output, 0x07); // 不支持的命令
             return;
         }
@@ -115,6 +122,7 @@ public class Socks5Handler implements Runnable {
                 targetHost = InetAddress.getByAddress(ipv6).getHostAddress();
                 break;
             default:
+                log.error("SOCKS proxy - Client handler({}), Handle request error, unsupported SOCKS address type {}", SocketUtils.socketInfo(clientSocket), addressType);
                 sendErrorResponse(output, 0x08); // 不支持的地址类型
                 return;
         }
@@ -122,7 +130,7 @@ public class Socks5Handler implements Runnable {
         // 读取目标端口
         int targetPort = input.readUnsignedShort();
 
-        log.info("SOCKS proxy process, connect to {}:{}", targetHost, targetPort);
+        log.info("SOCKS proxy - Client handler({}), Handle request, connect to {}:{}", SocketUtils.socketInfo(clientSocket), targetHost, targetPort);
 
         // 连接到目标服务器
         try (Socket targetSocket = new SSLVPNClient().connectToVPNServer(targetHost, targetPort)) {
@@ -132,12 +140,13 @@ public class Socks5Handler implements Runnable {
             // 开始数据转发
             SocketUtils.startTunnel(clientSocket, targetSocket);
         } catch (Exception ex) {
-            log.error("Exception when connect to target {}", ex.getMessage(), ex);
+            log.error("SOCKS proxy - Client handler({}), Handle request error {}", SocketUtils.socketInfo(clientSocket), ex.getMessage(), ex);
             sendErrorResponse(output, 0x05); // 连接被拒绝
         }
     }
 
     private void sendSuccessResponse(DataOutputStream output, InetAddress bindAddress, int bindPort) throws IOException {
+        log.info("SOCKS proxy - Client handler({}), Send success response", SocketUtils.socketInfo(clientSocket));
         output.writeByte(0x05); // SOCKS版本
         output.writeByte(0x00); // 成功
         output.writeByte(0x00); // 保留
@@ -155,6 +164,7 @@ public class Socks5Handler implements Runnable {
     }
 
     private void sendErrorResponse(DataOutputStream output, int errorCode) throws IOException {
+        log.info("SOCKS proxy - Client handler({}), Send error response, {}", SocketUtils.socketInfo(clientSocket), errorCode);
         output.writeByte(0x05); // SOCKS版本
         output.writeByte(errorCode); // 错误代码
         output.writeByte(0x00); // 保留

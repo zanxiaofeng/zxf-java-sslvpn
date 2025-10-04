@@ -65,7 +65,7 @@ public record ClientHandler(SSLSocket clientSocket) implements Runnable {
             // 连接到目标服务器
             log.info("SSL VPN gateway - Client handler({}), Handle connection request connect to {}:{}", SocketUtils.socketInfo(clientSocket), new String(targetHost), targetPort);
             Socket targetSocket = new Socket(new String(targetHost), targetPort);
-            log.info("SSL VPN gateway - Client handler({}), Handle connection request connected {}", SocketUtils.socketInfo(clientSocket), SocketUtils.socketInfo(targetSocket));
+            log.info("SSL VPN gateway - Client handler({}), Handle connection request connected to {}", SocketUtils.socketInfo(clientSocket), SocketUtils.socketInfo(targetSocket));
 
             sendSuccessResponse(clientOutput);
             // 开始数据转发
