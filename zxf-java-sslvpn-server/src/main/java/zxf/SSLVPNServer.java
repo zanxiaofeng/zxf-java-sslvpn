@@ -22,16 +22,16 @@ public class SSLVPNServer {
         SSLServerSocketFactory sslServerSocketFactory = SSLSocketFactories.sslServerSocketFactory();
         try (SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(SERVER_PORT)) {
             serverSocket.setNeedClientAuth(false); // 不需要客户端证书
-            log.info("SSL VPN gateway started on port {}", SERVER_PORT);
+            log.info("SSL VPN gateway, Started on port {}", SERVER_PORT);
 
             while (!Thread.currentThread().isInterrupted()) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                log.info("SSL VPN gateway, New client connected:  {}, {}, {}", clientSocket.getLocalSocketAddress(), clientSocket.getRemoteSocketAddress(), clientSocket.getSession());
+                log.info("SSL VPN gateway, New client connected:  {}", SocketUtils.socketInfo(clientSocket));
                 // 为每个客户端创建新线程
                 executorService.submit(new ClientHandler(clientSocket));
             }
         } catch (Exception ex) {
-            log.error("SSL VPN gateway error {}", ex.getMessage(), ex);
+            log.error("SSL VPN gateway, Error {}", ex.getMessage(), ex);
         } finally {
             executorService.shutdown();
         }

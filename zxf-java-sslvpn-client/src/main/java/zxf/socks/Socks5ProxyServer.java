@@ -2,6 +2,7 @@ package zxf.socks;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.extern.slf4j.Slf4j;
+import zxf.SocketUtils;
 
 import java.io.*;
 import java.net.*;
@@ -18,15 +19,15 @@ public class Socks5ProxyServer {
 
     public void start() {
         try (ServerSocket serverSocket = new ServerSocket(LOCAL_SOCKS_PORT)) {
-            log.info("SOCKS proxy started on port {}", LOCAL_SOCKS_PORT);
+            log.info("SOCKS proxy, Started on port {}", LOCAL_SOCKS_PORT);
 
             while (!Thread.currentThread().isInterrupted()) {
                 Socket clientSocket = serverSocket.accept();
-                log.info("SOCKS proxy, New client connected:  {}, {}", clientSocket.getLocalSocketAddress(), clientSocket.getRemoteSocketAddress());
+                log.info("SOCKS proxy, New client connected:  {}", SocketUtils.socketInfo(clientSocket));
                 executorService.submit(new Socks5Handler(clientSocket));
             }
         } catch (Exception ex) {
-            log.error("SOCKS proxy error {}", ex.getMessage(), ex);
+            log.error("SOCKS proxy, Error {}", ex.getMessage(), ex);
         } finally {
             executorService.shutdown();
         }

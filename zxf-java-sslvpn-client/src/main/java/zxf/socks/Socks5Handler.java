@@ -1,7 +1,6 @@
 package zxf.socks;
 
 import lombok.extern.slf4j.Slf4j;
-import zxf.DataForwarder;
 import zxf.SSLVPNClient;
 import zxf.SocketUtils;
 
