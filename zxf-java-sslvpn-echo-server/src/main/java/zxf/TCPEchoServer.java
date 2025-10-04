@@ -27,7 +27,7 @@ public class TCPEchoServer {
             log.info("TCP echo server, Started on port {}", SERVER_PORT);
 
             while (!Thread.currentThread().isInterrupted()) {
-                SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
+                Socket clientSocket = serverSocket.accept();
                 log.info("TCP echo server, New client connected:  {}", SocketUtils.socketInfo(clientSocket));
                 // 为每个客户端创建新线程
                 executorService.submit(new ClientHandler(clientSocket));

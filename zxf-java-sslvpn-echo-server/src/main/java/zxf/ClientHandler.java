@@ -2,13 +2,13 @@ package zxf;
 
 import lombok.extern.slf4j.Slf4j;
 
-import javax.net.ssl.SSLSocket;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.Socket;
 
 @Slf4j
-public record ClientHandler(SSLSocket clientSocket) implements Runnable {
+public record ClientHandler(Socket clientSocket) implements Runnable {
 
     @Override
     public void run() {
@@ -24,18 +24,12 @@ public record ClientHandler(SSLSocket clientSocket) implements Runnable {
     }
 
     private void handleClient() throws IOException {
-        startHandshake();
-
         DataInputStream clientInput = new DataInputStream(clientSocket.getInputStream());
         DataOutputStream clientOutput = new DataOutputStream(clientSocket.getOutputStream());
 
         handleRequest(clientInput, clientOutput);
     }
 
-    private void startHandshake() throws IOException {
-        log.info("TCP echo server - Client handler({}), Handshake start", SocketUtils.socketInfo(clientSocket));
-        clientSocket.startHandshake();
-    }
 
     private void handleRequest(DataInputStream clientInput, DataOutputStream clientOutput) throws IOException {
         log.info("TCP echo server - Client handler({}), Handle request start", SocketUtils.socketInfo(clientSocket));

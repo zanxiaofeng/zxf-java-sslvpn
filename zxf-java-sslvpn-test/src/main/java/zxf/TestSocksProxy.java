@@ -33,7 +33,7 @@ public class TestSocksProxy {
 
     private static void testTCPWithSocksProxy() throws Exception {
         // Create a SOCKS5 proxy instance
-        Proxy proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress("lcoalhost", 1080));
+        Proxy proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress("localhost", 1080));
 
         // Create a Socket and connect through the proxy
         Socket socket = new Socket(proxy);
