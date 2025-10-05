@@ -17,13 +17,13 @@ public class SSLVPNClient {
             SSLSocketFactory sslSocketFactory = SSLSocketFactories.sslSocketFactory();
             SSLSocket vpnSocket = (SSLSocket) sslSocketFactory.createSocket(VPN_SERVER_HOST, VPN_SERVER_PORT);
             vpnSocket.startHandshake();
-            log.info("Connected to SSL VPN gateway, {}, {}, {}", vpnSocket.getLocalSocketAddress(), vpnSocket.getRemoteSocketAddress(), vpnSocket.getSession());
+            log.info("SSL VPN client, Connected to SSL VPN gateway, {}, {}, {}", vpnSocket.getLocalSocketAddress(), vpnSocket.getRemoteSocketAddress(), vpnSocket.getSession());
 
             requestConnection(vpnSocket, targetHost, targetPort);
 
             return vpnSocket;
         } catch (Exception ex) {
-            log.error("Exception when connect to VPN Gateway {}", ex.getMessage(), ex);
+            log.error("SSL VPN client, Exception when connect to SSL VPN Gateway {}", ex.getMessage(), ex);
             throw ex;
         }
     }
@@ -45,7 +45,8 @@ public class SSLVPNClient {
         int success = vpnInput.readInt();
 
         if (responseType != 0x01 || success != 1) {
-            throw new RuntimeException("Error when connect to vpn");
+            log.error("SSL VPN client, Error response from SSL VPN gateway {}/{}", responseType, success);
+            throw new RuntimeException("Error response from SSL VPN gateway");
         }
     }
 }
