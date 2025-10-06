@@ -30,7 +30,7 @@ public class TunDeviceManager {
             String[] commands = {
                     // 将 10.8.0.0/24 网段的流量路由到 TUN 设备
                     "sudo ip route add 10.8.0.0/24 dev " + TUN_DEVICE_NAME,
-                    "sudo ip route add 198.18.0.0/24 dev " + TUN_DEVICE_NAME,
+                    "sudo ip route add 113.137.54.0/24 dev " + TUN_DEVICE_NAME,
                     // 启用 IP 转发
                     "sudo sysctl -w net.ipv4.ip_forward=1",
                     // 设置 NAT 规则（如果需要）
@@ -55,7 +55,7 @@ public class TunDeviceManager {
         try {
             String[] commands = {
                     "sudo ip route del 10.8.0.0/24 dev " + TUN_DEVICE_NAME,
-                    "sudo ip route del 198.18.0.0/24 dev " + TUN_DEVICE_NAME,
+                    "sudo ip route del 113.137.54.0/24 dev " + TUN_DEVICE_NAME,
                     // "sudo iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE"
             };
 

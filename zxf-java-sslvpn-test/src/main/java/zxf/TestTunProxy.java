@@ -12,9 +12,9 @@ import java.time.LocalDateTime;
 
 public class TestTunProxy {
     public static void main(String[] args) throws Exception {
-        testTCP();
+        //testTCP();
 
-        //testHttp();
+        testHttp();
     }
 
     private static void testHttp() throws Exception {
