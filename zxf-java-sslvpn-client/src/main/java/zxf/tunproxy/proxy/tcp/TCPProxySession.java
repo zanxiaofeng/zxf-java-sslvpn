@@ -2,15 +2,12 @@ package zxf.tunproxy.proxy.tcp;
 
 import lombok.extern.slf4j.Slf4j;
 import zxf.SSLVPNClient;
-import zxf.SocketUtils;
 import zxf.tunproxy.packet.PacketBuilder;
 import zxf.tunproxy.packet.PacketParser;
 import zxf.tunproxy.proxy.TunPacketWriter;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.Socket;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -20,18 +17,16 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 public class TCPProxySession {
+    private final Thread readThread = new Thread(this::readFromRealConnection);
+    private final Thread writeThread = new Thread(this::writeToRealConnection);
     private final TCPConnectionState state;
     private BlockingQueue<PacketParser.TCPPacket> packetQueue;
     private final TunPacketWriter packetWriter;
-    private Socket realSocket;
-    Thread readThread;
-    Thread writeThread;
-
 
     public TCPProxySession(PacketParser.IPPacket initalIpPacket, TunPacketWriter packetWriter) {
         this.state = new TCPConnectionState(initalIpPacket);
-        this.packetWriter = packetWriter;
         this.packetQueue = new LinkedBlockingQueue<>();
+        this.packetWriter = packetWriter;
     }
 
     public void start() {
@@ -138,7 +133,7 @@ public class TCPProxySession {
      */
     private boolean establishRealConnection() {
         try {
-            realSocket = new SSLVPNClient().connectToVPNServer(state.dstIP, state.dstPort);
+            state.realSocket = new SSLVPNClient().connectToVPNServer(state.dstIP, state.dstPort);
             return true;
         } catch (Exception e) {
             System.err.printf("建立真实连接失败: %s ", e.getMessage());
@@ -150,13 +145,7 @@ public class TCPProxySession {
      * 启动数据转发
      */
     private void startForwarding() {
-        // 启动从真实连接读取数据的线程
-        readThread = new Thread(this::readFromRealConnection);
-        readThread.setDaemon(true);
         readThread.start();
-
-        writeThread = new Thread(this::writeToRealConnection);
-        readThread.setDaemon(true);
         readThread.start();
     }
 

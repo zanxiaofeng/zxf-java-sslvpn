@@ -2,12 +2,17 @@ package zxf.tunproxy.proxy.tcp;
 
 import zxf.tunproxy.packet.PacketParser;
 
+import java.net.Socket;
+
 public class TCPConnectionState {
     // 连接信息
     public final String srcIP;
     public final String dstIP;
     public final int srcPort;
     public final int dstPort;
+
+    //
+    public Socket realSocket;
 
     // 客户端到服务器方向
     public long clientSeq = 0; // 客户端序列号
