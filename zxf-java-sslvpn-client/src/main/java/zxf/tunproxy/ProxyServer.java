@@ -2,24 +2,18 @@ package zxf.tunproxy;
 
 import lombok.extern.slf4j.Slf4j;
 import zxf.tunproxy.proxy.TunPacketProcessor;
-import zxf.tunproxy.jna.TunDevice;
 import zxf.tunproxy.tun.TunDeviceManager;
 
 @Slf4j
 public class ProxyServer {
-    private int tunFd;
-    private TunPacketProcessor packetProcessor;
 
     public static void main(String[] args) throws Exception {
-        ProxyServer server = new ProxyServer();
-        try {
-            server.start();
-        } finally {
-            server.stop();
-        }
+        new ProxyServer().start();
     }
 
-    public void start() {
+    public void start() throws Exception {
+        int tunFd = 0;
+        TunPacketProcessor packetProcessor = null;
         try {
             log.info("=== 基于 TUN 的代理服务器启动 ===");
             tunFd = TunDeviceManager.createTunDeviceAndSetupRoute();
@@ -27,18 +21,16 @@ public class ProxyServer {
             packetProcessor.startProcess();
         } catch (Exception ex) {
             log.error("代理服务器启动失败: {}", ex.getMessage(), ex);
-        }
-    }
+        } finally {
+            if (packetProcessor != null) {
+                packetProcessor.stopProcess();
+            }
 
-    public void stop() throws TunDevice.TunDeviceException {
-        if (packetProcessor != null) {
-            packetProcessor.stopProcess();
-        }
+            if (tunFd > 0) {
+                TunDeviceManager.cleanupRouteAndCloseTunDevice(tunFd);
+            }
 
-        if (tunFd > 0) {
-            TunDeviceManager.cleanupRouteAndCloseTunDevice(tunFd);
+            log.info("=== 基于 TUN 的代理服务器停止 ===");
         }
-
-        log.info("=== 基于 TUN 的代理服务器停止 ===");
     }
 }

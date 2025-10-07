@@ -3,7 +3,7 @@ package zxf.tunproxy.packet;
 /**
  * IP 数据包解析器
  */
-public class IPPacketParser {
+public class PacketParser {
     private static final int IP_HEADER_MIN_LENGTH = 20;
     private static final int IPV6_HEADER_LENGTH = 40;
 
@@ -27,6 +27,76 @@ public class IPPacketParser {
             return null;
         }
     }
+
+    /**
+     * 解析 TCP 头
+     */
+    public static TCPHeader parseTCPHeader(byte[] tcpData) {
+        if (tcpData == null || tcpData.length < 20) return null;
+
+        TCPHeader header = new TCPHeader();
+
+        // 源端口和目标端口
+        header.srcPort = ((tcpData[0] & 0xFF) << 8) | (tcpData[1] & 0xFF);
+        header.dstPort = ((tcpData[2] & 0xFF) << 8) | (tcpData[3] & 0xFF);
+
+        // 序列号
+        header.sequenceNumber = ((tcpData[4] & 0xFFL) << 24) |
+                ((tcpData[5] & 0xFFL) << 16) |
+                ((tcpData[6] & 0xFFL) << 8) |
+                (tcpData[7] & 0xFFL);
+
+        // 确认号
+        header.ackNumber = ((tcpData[8] & 0xFFL) << 24) |
+                ((tcpData[9] & 0xFFL) << 16) |
+                ((tcpData[10] & 0xFFL) << 8) |
+                (tcpData[11] & 0xFFL);
+
+        // 数据偏移和标志
+        header.headerLength = ((tcpData[12] & 0xF0) >> 4) * 4;
+        header.flags = tcpData[13] & 0xFF;
+
+        // 窗口大小
+        header.windowSize = ((tcpData[14] & 0xFF) << 8) | (tcpData[15] & 0xFF);
+
+        // 提取 TCP 载荷
+        if (tcpData.length > header.headerLength) {
+            int payloadLength = tcpData.length - header.headerLength;
+            header.payload = new byte[payloadLength];
+            System.arraycopy(tcpData, header.headerLength, header.payload, 0, payloadLength);
+        }
+
+        return header;
+    }
+
+    /**
+     * 解析 UDP 头
+     */
+    public static UDPHeader parseUDPHeader(byte[] udpData) {
+        if (udpData == null || udpData.length < 8) return null;
+
+        UDPHeader header = new UDPHeader();
+
+        // 源端口和目标端口
+        header.srcPort = ((udpData[0] & 0xFF) << 8) | (udpData[1] & 0xFF);
+        header.dstPort = ((udpData[2] & 0xFF) << 8) | (udpData[3] & 0xFF);
+
+        // 长度
+        header.length = ((udpData[4] & 0xFF) << 8) | (udpData[5] & 0xFF);
+
+        // 校验和
+        header.checksum = ((udpData[6] & 0xFF) << 8) | (udpData[7] & 0xFF);
+
+        // 提取 UDP 载荷
+        if (udpData.length > 8) {
+            int payloadLength = udpData.length - 8;
+            header.payload = new byte[payloadLength];
+            System.arraycopy(udpData, 8, header.payload, 0, payloadLength);
+        }
+
+        return header;
+    }
+
 
     /**
      * 解析 IPv4 数据包
@@ -289,6 +359,65 @@ public class IPPacketParser {
 
             sb.append("================ ");
             return sb.toString();
+        }
+    }
+
+    /**
+     * TCP 头结构
+     */
+    public static class TCPHeader {
+        public int srcPort;
+        public int dstPort;
+        public long sequenceNumber;
+        public long ackNumber;
+        public int flags;
+        public int windowSize;
+        public int headerLength;
+        public byte[] payload;
+
+        // TCP 标志位
+        public static final int FIN = 0x01;
+        public static final int SYN = 0x02;
+        public static final int RST = 0x04;
+        public static final int PSH = 0x08;
+        public static final int ACK = 0x10;
+        public static final int URG = 0x20;
+
+        public boolean hasFlag(int flag) {
+            return (flags & flag) != 0;
+        }
+
+        public String getFlagsString() {
+            StringBuilder sb = new StringBuilder();
+            if (hasFlag(FIN)) sb.append("FIN ");
+            if (hasFlag(SYN)) sb.append("SYN ");
+            if (hasFlag(RST)) sb.append("RST ");
+            if (hasFlag(PSH)) sb.append("PSH ");
+            if (hasFlag(ACK)) sb.append("ACK ");
+            if (hasFlag(URG)) sb.append("URG ");
+            return sb.toString().trim();
+        }
+
+        @Override
+        public String toString() {
+            return String.format("TCP: %d->%d seq=%d ack=%d flags=%s",
+                    srcPort, dstPort, sequenceNumber, ackNumber, getFlagsString());
+        }
+    }
+
+    /**
+     * UDP 头结构
+     */
+    public static class UDPHeader {
+        public int srcPort;
+        public int dstPort;
+        public int length;
+        public int checksum;
+        public byte[] payload;
+
+        @Override
+        public String toString() {
+            return String.format("UDP: %d->%d 长度: %d", srcPort, dstPort, length);
         }
     }
 }

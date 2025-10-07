@@ -9,6 +9,9 @@ public class TunDeviceManager {
     private static final String TUN_IP_ADDRESS = "10.8.0.1";
     private static final String TUN_NETMASK = "255.255.255.0";
 
+    /**
+     * 创建 TUN 设备并设置路由规则
+     */
     public static int createTunDeviceAndSetupRoute() throws TunDevice.TunDeviceException {
         int tunFd = TunDevice.createTunDevice(TUN_DEVICE_NAME);
         TunDevice.configureTunDevice(TUN_DEVICE_NAME, TUN_IP_ADDRESS, TUN_NETMASK);
@@ -16,6 +19,9 @@ public class TunDeviceManager {
         return tunFd;
     }
 
+    /**
+     * 清理路由规则并关闭 TUN 设备
+     */
     public static void cleanupRouteAndCloseTunDevice(int tunFd) throws TunDevice.TunDeviceException {
         cleanupRouting();
         TunDevice.closeTunDevice(tunFd);

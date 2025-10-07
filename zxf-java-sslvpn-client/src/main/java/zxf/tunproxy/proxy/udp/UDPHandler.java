@@ -1,7 +1,6 @@
-package zxf.tunproxy.proxy.handler;
+package zxf.tunproxy.proxy.udp;
 
-import zxf.tunproxy.packet.IPPacketParser;
-import zxf.tunproxy.proxy.ConnectionTracker;
+import zxf.tunproxy.packet.PacketParser;
 import zxf.tunproxy.proxy.TunPacketWriter;
 
 import java.net.*;
@@ -13,14 +12,11 @@ import java.util.concurrent.*;
  */
 public class UDPHandler {
     private final TunPacketWriter packetWriter;
-    private final ConnectionTracker connectionTracker;
     private final Map<String, DatagramSocket> udpSockets;
     private volatile boolean running;
 
-    public UDPHandler(TunPacketWriter packetWriter,
-                      ConnectionTracker connectionTracker) {
+    public UDPHandler(TunPacketWriter packetWriter) {
         this.packetWriter = packetWriter;
-        this.connectionTracker = connectionTracker;
         this.udpSockets = new ConcurrentHashMap<>();
         this.running = true;
     }
@@ -28,7 +24,7 @@ public class UDPHandler {
     /**
      * 处理 UDP 数据包
      */
-    public void handlePacket(IPPacketParser.IPPacket ipPacket, byte[] packet) {
+    public void handlePacket(PacketParser.IPPacket ipPacket, byte[] packet) {
         if (!running) return;
 
         String sessionKey = getSessionKey(ipPacket);
@@ -39,10 +35,6 @@ public class UDPHandler {
             if (socket == null) {
                 socket = new DatagramSocket();
                 udpSockets.put(sessionKey, socket);
-
-                // 注册连接
-                connectionTracker.registerConnection(ipPacket.sourceIP, ipPacket.destIP,
-                        ipPacket.sourcePort, ipPacket.destPort, 17);
             }
 
             // 提取 UDP 载荷
@@ -57,9 +49,6 @@ public class UDPHandler {
                 socket.send(udpPacket);
 
                 // 更新连接活动
-                connectionTracker.updateConnectionActivity(ipPacket.sourceIP, ipPacket.destIP,
-                        ipPacket.sourcePort, ipPacket.destPort, 17,
-                        udpPayload.length, true);
 
                 System.out.printf("UDP 数据转发: %s:%d -> %s:%d 长度: %d ",
                         ipPacket.sourceIP, ipPacket.sourcePort,
@@ -74,7 +63,7 @@ public class UDPHandler {
     /**
      * 生成会话键
      */
-    private String getSessionKey(IPPacketParser.IPPacket ipPacket) {
+    private String getSessionKey(PacketParser.IPPacket ipPacket) {
         return String.format("%s:%d->%s:%d",
                 ipPacket.sourceIP, ipPacket.sourcePort,
                 ipPacket.destIP, ipPacket.destPort);
