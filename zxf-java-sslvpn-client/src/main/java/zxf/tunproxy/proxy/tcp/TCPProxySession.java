@@ -19,48 +19,131 @@ import java.util.concurrent.TimeUnit;
  * TCP 代理会话
  */
 @Slf4j
-public class TCPProxySession implements Runnable {
-    private final String srcIP;
-    private final String dstIP;
-    private final int srcPort;
-    private final int dstPort;
+public class TCPProxySession {
+    private final TCPConnectionState state;
+    private BlockingQueue<PacketParser.TCPPacket> packetQueue;
     private final TunPacketWriter packetWriter;
     private Socket realSocket;
-    private InputStream realInput;
-    private OutputStream realOutput;
-    private BlockingQueue<byte[]> packetQueue;
+    Thread readThread;
+    Thread writeThread;
+
 
     public TCPProxySession(PacketParser.IPPacket initalIpPacket, TunPacketWriter packetWriter) {
-        this.srcIP = initalIpPacket.sourceIP;
-        this.srcPort = initalIpPacket.sourcePort;
-        this.dstIP = initalIpPacket.destIP;
-        this.dstPort = initalIpPacket.destPort;
+        this.state = new TCPConnectionState(initalIpPacket);
         this.packetWriter = packetWriter;
         this.packetQueue = new LinkedBlockingQueue<>();
     }
 
-    @Override
-    public void run() {
-        try {
-            establishRealConnection();
+    public void start() {
+        new Thread(() -> {
+            // 处理 TCP 握手
+            if (!establishProxyConnection()) {
+                return;
+            }
+
+            // 建立真实连接
+            if (!establishRealConnection()) {
+                return;
+            }
+
+            // 启动数据转发
             startForwarding();
-        } catch (Exception ex) {
-            log.error("TCP 会话错误 {}:{}->{}:{}: {}", srcIP, srcPort, dstIP, dstPort, ex.getMessage(), ex);
-        } finally {
-            stop();
+        }).start();
+    }
+
+
+    private boolean establishProxyConnection() {
+        try {
+            // 等待 SYN 包
+            PacketParser.TCPPacket synPacket = waitForSYN();
+            if (synPacket == null) {
+                return false;
+            }
+
+            // 发送 SYN-ACK 响应
+            sendSYNACK(synPacket);
+
+            // 等待 ACK 完成握手
+            PacketParser.TCPPacket ackPacket = waitForACK();
+            if (ackPacket == null) {
+                return false;
+            }
+
+            // 握手完成
+            state.established = true;
+            return true;
+        } catch (Exception e) {
+            System.err.printf("TCP 握手失败 %s: %s ", e.getMessage());
+            return false;
         }
+    }
+
+
+    /**
+     * 等待 SYN 包
+     */
+    private PacketParser.TCPPacket waitForSYN() throws InterruptedException {
+        long startTime = System.currentTimeMillis();
+        while (System.currentTimeMillis() - startTime < 5000) { // 5秒超时
+            PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
+            if (packetData != null && packetData.hasFlag(PacketParser.TCPPacket.SYN)) {
+                return packetData;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 发送 SYN-ACK 响应
+     */
+    private void sendSYNACK(PacketParser.TCPPacket synPacket) {
+        try {
+            // 创建 SYN-ACK 包
+            byte flags = (byte) (PacketParser.TCPPacket.SYN | PacketParser.TCPPacket.ACK);
+
+            // 更新状态
+            //state.serverSeq = proxyInitialSeq;
+            state.serverAck = synPacket.sequenceNumber + 1; // SYN 占用一个序列号
+            state.serverSynReceived = true;
+
+
+            // 创建响应包
+            byte[] responsePacket = PacketBuilder.createTCPPacket(synPacket.ipPacket.destIP, synPacket.ipPacket.sourceIP,
+                    synPacket.srcPort, synPacket.dstPort, state.serverSeq, state.serverAck, flags, 0, null);
+
+            System.out.printf("发送 SYN-ACK: seq=%d ack=%d ", state.serverSeq, state.serverAck);
+            packetWriter.writePacket(responsePacket);
+        } catch (Exception e) {
+            System.err.printf("发送 SYN-ACK 失败: %s ", e.getMessage());
+        }
+    }
+
+
+    /**
+     * 等待 ACK 包
+     */
+    private PacketParser.TCPPacket waitForACK() throws InterruptedException {
+        long startTime = System.currentTimeMillis();
+        while (System.currentTimeMillis() - startTime < 5000) { // 5秒超时
+            PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
+            if (packetData != null && packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
+                return packetData;
+            }
+        }
+        return null;
     }
 
     /**
      * 建立真实 TCP 连接
      */
-    private void establishRealConnection() throws Exception {
-        realSocket = new SSLVPNClient().connectToVPNServer(dstIP, dstPort);
-
-        realInput = realSocket.getInputStream();
-        realOutput = realSocket.getOutputStream();
-
-        log.info("TCP 连接已建立 {}:{}->{}:{} ", srcIP, srcPort, dstIP, dstPort);
+    private boolean establishRealConnection() {
+        try {
+            realSocket = new SSLVPNClient().connectToVPNServer(state.dstIP, state.dstPort);
+            return true;
+        } catch (Exception e) {
+            System.err.printf("建立真实连接失败: %s ", e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -68,60 +151,46 @@ public class TCPProxySession implements Runnable {
      */
     private void startForwarding() {
         // 启动从真实连接读取数据的线程
-        Thread readThread = new Thread(this::readFromRealConnection);
+        readThread = new Thread(this::readFromRealConnection);
         readThread.setDaemon(true);
         readThread.start();
 
+        writeThread = new Thread(this::writeToRealConnection);
+        readThread.setDaemon(true);
+        readThread.start();
+    }
+
+
+    /**
+     * 处理来自 TUN 的数据包
+     */
+    public void submitPacket(PacketParser.TCPPacket tcpPacket) {
+        packetQueue.offer(tcpPacket);
+    }
+
+
+    /**
+     * 转发数据到真实连接
+     */
+    private void writeToRealConnection() {
         // 处理来自 TUN 设备的数据包
-        while (!Thread.currentThread().isInterrupted()) {
-            try {
+        try {
+            OutputStream realOutput = realSocket.getOutputStream();
+
+            while (!Thread.currentThread().isInterrupted()) {
                 byte[] packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
                 if (packetData != null) {
-                    forwardToRealConnection(packetData);
+                    realOutput.write(tcpPayload);
+                    realOutput.flush();
                 }
 
                 // 检查连接是否还活跃
                 if (realSocket.isClosed() || !realSocket.isConnected()) {
                     break;
                 }
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception ex) {
-                log.error("转发数据时发生错误: {}", ex.getMessage());
-                break;
             }
-        }
-    }
-
-    /**
-     * 处理来自 TUN 的数据包
-     */
-    public void handlePacket(PacketParser.IPPacket ipPacket, byte[] packet) {
-        // 提取 TCP 载荷
-        if (ipPacket.payload != null && ipPacket.payload.length > 20) {
-            // TCP 头至少 20 字节，载荷从第 20 字节开始
-            int tcpHeaderLength = ((ipPacket.payload[12] & 0xF0) >> 4) * 4;
-            if (ipPacket.payload.length > tcpHeaderLength) {
-                byte[] tcpPayload = new byte[ipPacket.payload.length - tcpHeaderLength];
-                System.arraycopy(ipPacket.payload, tcpHeaderLength, tcpPayload, 0, tcpPayload.length);
-                // 将载荷加入队列，准备转发到真实连接
-                packetQueue.offer(tcpPayload);
-            }
-        }
-    }
-
-    /**
-     * 转发数据到真实连接
-     */
-    private void forwardToRealConnection(byte[] tcpPayload) {
-        try {
-            realOutput.write(tcpPayload);
-            realOutput.flush();
-            // 更新连接活动
-        } catch (IOException ex) {
-            log.error("向真实连接写入数据失败: {}", ex.getMessage(), ex);
-            stop();
+        } catch (Exception ex) {
+            log.error("转发数据时发生错误: {}", ex.getMessage());
         }
     }
 
@@ -129,10 +198,11 @@ public class TCPProxySession implements Runnable {
      * 从真实连接读取数据
      */
     private void readFromRealConnection() {
-        byte[] buffer = new byte[4096];
-
         try {
-            while (!realSocket.isClosed()) {
+            InputStream realInput = realSocket.getInputStream();
+
+            while (!Thread.currentThread().isInterrupted()) {
+                byte[] buffer = new byte[4096];
                 int bytesRead = realInput.read(buffer);
                 if (bytesRead == -1) {
                     break; // 连接关闭
@@ -147,27 +217,8 @@ public class TCPProxySession implements Runnable {
 
                 }
             }
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             log.error("从真实连接读取数据失败: {}", ex.getMessage(), ex);
-        } finally {
-            stop();
         }
-    }
-
-    /**
-     * 创建响应数据包
-     */
-    private byte[] createResponsePacket(byte[] data, int length) {
-        // 交换源和目标，创建响应包
-        return PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort,
-                0, 0, (byte) 0x10, data); // ACK 标志
-    }
-
-    /**
-     * 停止会话
-     */
-    public void stop() {
-        SocketUtils.closeQuietly(realSocket);
-        log.info("TCP 会话已关闭 {}:{}->{}:{} ", srcIP, srcPort, dstIP, dstPort);
     }
 }

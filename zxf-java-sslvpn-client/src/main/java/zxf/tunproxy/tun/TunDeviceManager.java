@@ -3,6 +3,9 @@ package zxf.tunproxy.tun;
 import lombok.extern.slf4j.Slf4j;
 import zxf.tunproxy.jna.TunDevice;
 
+/**
+ * TUN 设备管理器
+ */
 @Slf4j
 public class TunDeviceManager {
     private static final String TUN_DEVICE_NAME = "tun-proxy";

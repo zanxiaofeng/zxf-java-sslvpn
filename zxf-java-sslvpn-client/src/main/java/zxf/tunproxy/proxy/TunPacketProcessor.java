@@ -22,6 +22,9 @@ public class TunPacketProcessor {
         this.tcpHandler = new TCPHandler(packetWriter);
     }
 
+    /**
+     * 启动处理器
+     */
     public void startProcess() {
         log.info("=== TUN 数据包处理器启动 ===");
 
@@ -73,10 +76,10 @@ public class TunPacketProcessor {
             // 根据协议类型分发处理
             switch (ipPacket.protocol) {
                 case 6: // TCP
-                    tcpHandler.handlePacket(ipPacket, packet);
+                    tcpHandler.handlePacket(ipPacket);
                     break;
                 default:
-                    handleOtherProtocol(ipPacket, packet);
+                    handleOtherProtocol(ipPacket);
                     break;
             }
         } catch (Exception ex) {
@@ -99,7 +102,7 @@ public class TunPacketProcessor {
     /**
      * 处理其他协议
      */
-    private void handleOtherProtocol(PacketParser.IPPacket ipPacket, byte[] packet) {
+    private void handleOtherProtocol(PacketParser.IPPacket ipPacket) {
         log.info("不支持的协议: {} -> {} 协议: {} ", ipPacket.sourceIP, ipPacket.destIP, ipPacket.protocol);
     }
 }

@@ -31,39 +31,39 @@ public class PacketParser {
     /**
      * 解析 TCP 头
      */
-    public static TCPHeader parseTCPHeader(byte[] tcpData) {
-        if (tcpData == null || tcpData.length < 20) return null;
+    public static TCPPacket parseTCPPacket(IPPacket ipPacket) {
+        if (ipPacket.payload == null || ipPacket.payload.length < 20) return null;
 
-        TCPHeader header = new TCPHeader();
+        TCPPacket header = new TCPPacket();
 
         // 源端口和目标端口
-        header.srcPort = ((tcpData[0] & 0xFF) << 8) | (tcpData[1] & 0xFF);
-        header.dstPort = ((tcpData[2] & 0xFF) << 8) | (tcpData[3] & 0xFF);
+        header.srcPort = ((ipPacket.payload[0] & 0xFF) << 8) | (ipPacket.payload[1] & 0xFF);
+        header.dstPort = ((ipPacket.payload[2] & 0xFF) << 8) | (ipPacket.payload[3] & 0xFF);
 
         // 序列号
-        header.sequenceNumber = ((tcpData[4] & 0xFFL) << 24) |
-                ((tcpData[5] & 0xFFL) << 16) |
-                ((tcpData[6] & 0xFFL) << 8) |
-                (tcpData[7] & 0xFFL);
+        header.sequenceNumber = ((ipPacket.payload[4] & 0xFFL) << 24) |
+                ((ipPacket.payload[5] & 0xFFL) << 16) |
+                ((ipPacket.payload[6] & 0xFFL) << 8) |
+                (ipPacket.payload[7] & 0xFFL);
 
         // 确认号
-        header.ackNumber = ((tcpData[8] & 0xFFL) << 24) |
-                ((tcpData[9] & 0xFFL) << 16) |
-                ((tcpData[10] & 0xFFL) << 8) |
-                (tcpData[11] & 0xFFL);
+        header.ackNumber = ((ipPacket.payload[8] & 0xFFL) << 24) |
+                ((ipPacket.payload[9] & 0xFFL) << 16) |
+                ((ipPacket.payload[10] & 0xFFL) << 8) |
+                (ipPacket.payload[11] & 0xFFL);
 
         // 数据偏移和标志
-        header.headerLength = ((tcpData[12] & 0xF0) >> 4) * 4;
-        header.flags = tcpData[13] & 0xFF;
+        header.headerLength = ((ipPacket.payload[12] & 0xF0) >> 4) * 4;
+        header.flags = ipPacket.payload[13] & 0xFF;
 
         // 窗口大小
-        header.windowSize = ((tcpData[14] & 0xFF) << 8) | (tcpData[15] & 0xFF);
+        header.windowSize = ((ipPacket.payload[14] & 0xFF) << 8) | (ipPacket.payload[15] & 0xFF);
 
         // 提取 TCP 载荷
-        if (tcpData.length > header.headerLength) {
-            int payloadLength = tcpData.length - header.headerLength;
+        if (ipPacket.payload.length > header.headerLength) {
+            int payloadLength = ipPacket.payload.length - header.headerLength;
             header.payload = new byte[payloadLength];
-            System.arraycopy(tcpData, header.headerLength, header.payload, 0, payloadLength);
+            System.arraycopy(ipPacket.payload, header.headerLength, header.payload, 0, payloadLength);
         }
 
         return header;
@@ -365,7 +365,8 @@ public class PacketParser {
     /**
      * TCP 头结构
      */
-    public static class TCPHeader {
+    public static class TCPPacket {
+        public IPPacket ipPacket;
         public int srcPort;
         public int dstPort;
         public long sequenceNumber;

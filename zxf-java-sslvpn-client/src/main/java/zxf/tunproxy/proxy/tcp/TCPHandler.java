@@ -4,8 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import zxf.tunproxy.packet.PacketParser;
 import zxf.tunproxy.proxy.TunPacketWriter;
 
-import java.io.*;
-import java.net.*;
 import java.util.Map;
 import java.util.concurrent.*;
 
@@ -25,18 +23,18 @@ public class TCPHandler {
     /**
      * 处理 TCP 数据包
      */
-    public void handlePacket(PacketParser.IPPacket ipPacket, byte[] packet) {
+    public void handlePacket(PacketParser.IPPacket ipPacket) {
         String sessionKey = getSessionKey(ipPacket);
 
         // 获取或创建会话
-        TCPProxySession session = activeSessions.get(sessionKey);
-        if (session == null) {
-            session = new TCPProxySession(ipPacket, packetWriter);
-            activeSessions.put(sessionKey, session);
-        }
+        TCPProxySession session = activeSessions.computeIfAbsent(sessionKey, k -> {
+            TCPProxySession tcpProxySession = new TCPProxySession(ipPacket, packetWriter);
+            tcpProxySession.start();
+            return tcpProxySession;
+        });
 
         // 处理数据包
-        session.handlePacket(ipPacket, packet);
+        session.handlePacket(PacketParser.parseTCPPacket(ipPacket));
     }
 
     /**
