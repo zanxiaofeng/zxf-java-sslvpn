@@ -23,9 +23,10 @@ public class TCPProxySession {
     private BlockingQueue<PacketParser.TCPPacket> packetQueue;
     private final TunPacketWriter packetWriter;
 
-    public TCPProxySession(PacketParser.IPPacket initalIpPacket, TunPacketWriter packetWriter) {
-        this.state = new TCPConnectionState(initalIpPacket);
+    public TCPProxySession(PacketParser.TCPPacket initalTCPPacket, TunPacketWriter packetWriter) {
+        this.state = new TCPConnectionState(initalTCPPacket.ipPacket);
         this.packetQueue = new LinkedBlockingQueue<>();
+        this.packetQueue.offer(initalTCPPacket);
         this.packetWriter = packetWriter;
     }
 
@@ -78,10 +79,16 @@ public class TCPProxySession {
      * 等待 SYN 包
      */
     private PacketParser.TCPPacket waitForSYN() throws InterruptedException {
+        log.info("等待 SYN 包...");
         long startTime = System.currentTimeMillis();
         while (System.currentTimeMillis() - startTime < 5000) { // 5秒超时
             PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
             if (packetData != null && packetData.hasFlag(PacketParser.TCPPacket.SYN)) {
+                // 更新状态
+                log.info("收到 SYN 包 {}", packetData);
+                state.serverSeq = 100000;
+                state.serverAck = packetData.sequenceNumber + 1; // SYN 占用一个序列号
+                state.serverSynReceived = true;
                 return packetData;
             }
         }
@@ -96,18 +103,15 @@ public class TCPProxySession {
             // 创建 SYN-ACK 包
             byte flags = (byte) (PacketParser.TCPPacket.SYN | PacketParser.TCPPacket.ACK);
 
-            // 更新状态
-            //state.serverSeq = proxyInitialSeq;
-            state.serverAck = synPacket.sequenceNumber + 1; // SYN 占用一个序列号
-            state.serverSynReceived = true;
-
-
             // 创建响应包
-            byte[] responsePacket = PacketBuilder.createTCPPacket(synPacket.ipPacket.destIP, synPacket.ipPacket.sourceIP,
-                    synPacket.srcPort, synPacket.dstPort, state.serverSeq, state.serverAck, flags, 0, null);
+            byte[] responsePacket = PacketBuilder.createTCPPacket(synPacket.ipPacket.dstIP, synPacket.ipPacket.srcIP,
+                    synPacket.dstPort, synPacket.srcPort, state.serverSeq, state.serverAck, flags, 0, null);
 
-            System.out.printf("发送 SYN-ACK: seq=%d ack=%d ", state.serverSeq, state.serverAck);
+            log.info("发送 SYN-ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(responsePacket, responsePacket.length)));
             packetWriter.writePacket(responsePacket);
+
+            state.serverSeq += 1;
+            state.clientSynSent = true;
         } catch (Exception e) {
             System.err.printf("发送 SYN-ACK 失败: %s ", e.getMessage());
         }
@@ -118,10 +122,13 @@ public class TCPProxySession {
      * 等待 ACK 包
      */
     private PacketParser.TCPPacket waitForACK() throws InterruptedException {
+        log.info("等待 ACK 包...");
         long startTime = System.currentTimeMillis();
         while (System.currentTimeMillis() - startTime < 5000) { // 5秒超时
             PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
             if (packetData != null && packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
+                log.info("收到 ACK 包 {}", packetData);
+                state.serverAck = packetData.sequenceNumber + 1;
                 return packetData;
             }
         }
@@ -133,7 +140,8 @@ public class TCPProxySession {
      */
     private boolean establishRealConnection() {
         try {
-            state.realSocket = new SSLVPNClient().connectToVPNServer(state.dstIP, state.dstPort);
+            log.info("建立真实连接: {}:{} ", state.dstIP, state.dstPort);
+            state.realSocket = new SSLVPNClient().connectToVPNServer("127.0.0.1", state.dstPort);
             return true;
         } catch (Exception e) {
             System.err.printf("建立真实连接失败: %s ", e.getMessage());
@@ -146,7 +154,7 @@ public class TCPProxySession {
      */
     private void startForwarding() {
         readThread.start();
-        readThread.start();
+        writeThread.start();
     }
 
 
@@ -164,22 +172,25 @@ public class TCPProxySession {
     private void writeToRealConnection() {
         // 处理来自 TUN 设备的数据包
         try {
-            OutputStream realOutput = realSocket.getOutputStream();
+            log.info("=== 开始转发数据 ===");
+            OutputStream realOutput = state.realSocket.getOutputStream();
 
             while (!Thread.currentThread().isInterrupted()) {
-                byte[] packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
+                PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
                 if (packetData != null) {
-                    realOutput.write(tcpPayload);
+                    log.info("收到数据包 {}", packetData);
+                    state.serverAck = packetData.sequenceNumber + packetData.payload.length;
+                    realOutput.write(packetData.payload);
                     realOutput.flush();
                 }
 
                 // 检查连接是否还活跃
-                if (realSocket.isClosed() || !realSocket.isConnected()) {
+                if (state.realSocket.isClosed() || !state.realSocket.isConnected()) {
                     break;
                 }
             }
         } catch (Exception ex) {
-            log.error("转发数据时发生错误: {}", ex.getMessage());
+            log.error("转发数据时发生错误: {}", ex.getMessage(), ex);
         }
     }
 
@@ -188,22 +199,25 @@ public class TCPProxySession {
      */
     private void readFromRealConnection() {
         try {
-            InputStream realInput = realSocket.getInputStream();
+            log.info("=== 开始读取数据 ===");
+            InputStream realInput = state.realSocket.getInputStream();
 
             while (!Thread.currentThread().isInterrupted()) {
                 byte[] buffer = new byte[4096];
+
                 int bytesRead = realInput.read(buffer);
                 if (bytesRead == -1) {
                     break; // 连接关闭
                 }
 
                 if (bytesRead > 0) {
-                    // 创建响应数据包
-                    byte[] responsePacket = createResponsePacket(buffer, bytesRead);
+                    byte[] responsePacket = PacketBuilder.createTCPPacket(state.dstIP, state.srcIP,
+                            state.dstPort, state.srcPort, state.serverSeq, state.serverAck, (byte) 0, 0, null);
                     packetWriter.writePacket(responsePacket);
+                    log.info("发送数据包 {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(responsePacket, responsePacket.length)));
 
                     // 更新连接活动
-
+                    state.serverSeq += bytesRead;
                 }
             }
         } catch (Exception ex) {

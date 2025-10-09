@@ -12,9 +12,11 @@ import java.time.LocalDateTime;
 
 public class TestTunProxy {
     public static void main(String[] args) throws Exception {
-        //testTCP();
+        System.setProperty("javax.net.debug", "all");
 
-        testHttp();
+        testTCP();
+
+        //testHttp();
     }
 
     private static void testHttp() throws Exception {
@@ -32,7 +34,7 @@ public class TestTunProxy {
 
     private static void testTCP() throws Exception {
         // Create a Socket and connect through the proxy
-        Socket socket = new Socket("198.18.0.1", 8008);
+        Socket socket = new Socket("113.137.54.1", 8008);
 
         Thread socketThread = new Thread(() -> {
             try {

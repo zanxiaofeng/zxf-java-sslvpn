@@ -23,24 +23,25 @@ public class TCPHandler {
     /**
      * 处理 TCP 数据包
      */
-    public void handlePacket(PacketParser.IPPacket ipPacket) {
-        String sessionKey = getSessionKey(ipPacket);
+    public void handlePacket(PacketParser.TCPPacket tcpPacket) {
+        String sessionKey = getSessionKey(tcpPacket);
 
-        // 获取或创建会话
-        TCPProxySession session = activeSessions.computeIfAbsent(sessionKey, k -> {
-            TCPProxySession tcpProxySession = new TCPProxySession(ipPacket, packetWriter);
-            tcpProxySession.start();
-            return tcpProxySession;
-        });
+        if (activeSessions.containsKey(sessionKey)) {
+            log.debug("会话已存在，提交数据包: {}", sessionKey);
+            activeSessions.get(sessionKey).submitPacket(tcpPacket);
+            return;
+        }
 
-        // 处理数据包
-        session.handlePacket(PacketParser.parseTCPPacket(ipPacket));
+        log.debug("会话不存在，创建新会话: {}", sessionKey);
+        TCPProxySession tcpProxySession = new TCPProxySession(tcpPacket, packetWriter);
+        tcpProxySession.start();
+        activeSessions.put(sessionKey, tcpProxySession);
     }
 
     /**
      * 生成会话键
      */
-    private String getSessionKey(PacketParser.IPPacket ipPacket) {
-        return String.format("%s:%d->%s:%d", ipPacket.sourceIP, ipPacket.sourcePort, ipPacket.destIP, ipPacket.destPort);
+    private String getSessionKey(PacketParser.TCPPacket tcpPacket) {
+        return String.format("%s:%d->%s:%d", tcpPacket.ipPacket.srcIP,tcpPacket.ipPacket.srcPort, tcpPacket.srcPort, tcpPacket.dstPort);
     }
 }

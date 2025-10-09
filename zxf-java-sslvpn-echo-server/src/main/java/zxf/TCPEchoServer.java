@@ -38,6 +38,7 @@ public class TCPEchoServer {
     }
 
     public static void main(String[] args) throws Exception {
+        System.setProperty("javax.net.debug", "all");
         new TCPEchoServer().start();
     }
 }

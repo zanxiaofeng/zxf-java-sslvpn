@@ -43,16 +43,16 @@ public class UDPHandler {
                 System.arraycopy(ipPacket.payload, 8, udpPayload, 0, udpPayload.length);
 
                 // 发送到真实目标
-                InetAddress targetAddr = InetAddress.getByName(ipPacket.destIP);
+                InetAddress targetAddr = InetAddress.getByName(ipPacket.dstIP);
                 DatagramPacket udpPacket = new DatagramPacket(udpPayload, udpPayload.length,
-                        targetAddr, ipPacket.destPort);
+                        targetAddr, ipPacket.dstPort);
                 socket.send(udpPacket);
 
                 // 更新连接活动
 
                 System.out.printf("UDP 数据转发: %s:%d -> %s:%d 长度: %d ",
-                        ipPacket.sourceIP, ipPacket.sourcePort,
-                        ipPacket.destIP, ipPacket.destPort, udpPayload.length);
+                        ipPacket.srcIP, ipPacket.srcPort,
+                        ipPacket.dstIP, ipPacket.dstPort, udpPayload.length);
             }
 
         } catch (Exception e) {
@@ -65,8 +65,8 @@ public class UDPHandler {
      */
     private String getSessionKey(PacketParser.IPPacket ipPacket) {
         return String.format("%s:%d->%s:%d",
-                ipPacket.sourceIP, ipPacket.sourcePort,
-                ipPacket.destIP, ipPacket.destPort);
+                ipPacket.srcIP, ipPacket.srcPort,
+                ipPacket.dstIP, ipPacket.dstPort);
     }
 
     /**

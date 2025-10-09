@@ -70,39 +70,18 @@ public class TunPacketProcessor {
                 return;
             }
 
-            // 记录日志
-            logPacket(ipPacket);
-
             // 根据协议类型分发处理
             switch (ipPacket.protocol) {
                 case 6: // TCP
-                    tcpHandler.handlePacket(ipPacket);
+                    PacketParser.TCPPacket tcpPacket = PacketParser.parseTCPPacket(ipPacket);
+                    tcpHandler.handlePacket(tcpPacket);
                     break;
                 default:
-                    handleOtherProtocol(ipPacket);
+                    //log.info("{}", ipPacket);
                     break;
             }
         } catch (Exception ex) {
             log.error("处理数据包时发生错误: {}", ex.getMessage(), ex);
         }
-    }
-
-    /**
-     * 记录数据包日志
-     */
-    private void logPacket(PacketParser.IPPacket ipPacket) {
-        if (ipPacket.sourcePort > 0 && ipPacket.destPort > 0) {
-            log.info("数据包({}): {}:{} -> {}:{}, 协议: {}, 长度: {}", ipPacket.version, ipPacket.sourceIP, ipPacket.sourcePort, ipPacket.destIP, ipPacket.destPort,
-                    ipPacket.protocolName, ipPacket.totalLength);
-            return;
-        }
-        log.info("数据包({}): {} -> {}, 协议: {}, 长度: {}", ipPacket.version, ipPacket.sourceIP, ipPacket.destIP, ipPacket.protocolName, ipPacket.totalLength);
-    }
-
-    /**
-     * 处理其他协议
-     */
-    private void handleOtherProtocol(PacketParser.IPPacket ipPacket) {
-        log.info("不支持的协议: {} -> {} 协议: {} ", ipPacket.sourceIP, ipPacket.destIP, ipPacket.protocol);
     }
 }

@@ -35,6 +35,7 @@ public class PacketParser {
         if (ipPacket.payload == null || ipPacket.payload.length < 20) return null;
 
         TCPPacket header = new TCPPacket();
+        header.ipPacket = ipPacket;
 
         // 源端口和目标端口
         header.srcPort = ((ipPacket.payload[0] & 0xFF) << 8) | (ipPacket.payload[1] & 0xFF);
@@ -135,10 +136,10 @@ public class PacketParser {
         ipPacket.headerChecksum = ((packet[10] & 0xFF) << 8) | (packet[11] & 0xFF);
 
         // 源 IP 地址
-        ipPacket.sourceIP = bytesToIPv4(packet, 12);
+        ipPacket.srcIP = bytesToIPv4(packet, 12);
 
         // 目标 IP 地址
-        ipPacket.destIP = bytesToIPv4(packet, 16);
+        ipPacket.dstIP = bytesToIPv4(packet, 16);
 
         // 选项（如果有）
         if (ihl > 5) {
@@ -186,10 +187,10 @@ public class PacketParser {
         ipPacket.ttl = packet[7] & 0xFF;
 
         // 源 IPv6 地址
-        ipPacket.sourceIP = bytesToIPv6(packet, 8);
+        ipPacket.srcIP = bytesToIPv6(packet, 8);
 
         // 目标 IPv6 地址
-        ipPacket.destIP = bytesToIPv6(packet, 24);
+        ipPacket.dstIP = bytesToIPv6(packet, 24);
 
         // 数据载荷
         int dataLength = length - IPV6_HEADER_LENGTH;
@@ -217,19 +218,19 @@ public class PacketParser {
         switch (ipPacket.protocol) {
             case 6: // TCP
                 if (payload.length >= 20) {
-                    ipPacket.sourcePort = ((payload[0] & 0xFF) << 8) | (payload[1] & 0xFF);
-                    ipPacket.destPort = ((payload[2] & 0xFF) << 8) | (payload[3] & 0xFF);
+                    ipPacket.srcPort = ((payload[0] & 0xFF) << 8) | (payload[1] & 0xFF);
+                    ipPacket.dstPort = ((payload[2] & 0xFF) << 8) | (payload[3] & 0xFF);
                     ipPacket.transportInfo = String.format("TCP %d->%d",
-                            ipPacket.sourcePort, ipPacket.destPort);
+                            ipPacket.srcPort, ipPacket.dstPort);
                 }
                 break;
             case 17: // UDP
                 if (payload.length >= 8) {
-                    ipPacket.sourcePort = ((payload[0] & 0xFF) << 8) | (payload[1] & 0xFF);
-                    ipPacket.destPort = ((payload[2] & 0xFF) << 8) | (payload[3] & 0xFF);
+                    ipPacket.srcPort = ((payload[0] & 0xFF) << 8) | (payload[1] & 0xFF);
+                    ipPacket.dstPort = ((payload[2] & 0xFF) << 8) | (payload[3] & 0xFF);
                     int udpLength = ((payload[4] & 0xFF) << 8) | (payload[5] & 0xFF);
                     ipPacket.transportInfo = String.format("UDP %d->%d len=%d",
-                            ipPacket.sourcePort, ipPacket.destPort, udpLength);
+                            ipPacket.srcPort, ipPacket.dstPort, udpLength);
                 }
                 break;
             case 1: // ICMP
@@ -312,53 +313,19 @@ public class PacketParser {
         public int protocol;
         public String protocolName;
         public int headerChecksum;
-        public String sourceIP;
-        public String destIP;
+        public String srcIP;
+        public String dstIP;
         public byte[] options;
         public byte[] payload;
-        public int sourcePort;
-        public int destPort;
+        public int srcPort;
+        public int dstPort;
         public String transportInfo;
         public int trafficClass;
         public int flowLabel;
 
         @Override
         public String toString() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("=== IP Packet === ");
-
-            if (version == 4) {
-                sb.append("版本: IPv4 ");
-                sb.append(String.format("头长度: %d 字节 ", headerLength));
-                sb.append(String.format("总长度: %d 字节 ", totalLength));
-                sb.append(String.format("DSCP: %d, ECN: %d ", dscp, ecn));
-                sb.append(String.format("标识: 0x%04x ", identification));
-                sb.append(String.format("标志: %d, 分片偏移: %d ", flags, fragmentOffset));
-                sb.append(String.format("TTL: %d ", ttl));
-                sb.append(String.format("协议: %d (%s) ", protocol, protocolName));
-                sb.append(String.format("头部校验和: 0x%04x ", headerChecksum));
-            } else {
-                sb.append("版本: IPv6 ");
-                sb.append(String.format("流量类别: %d ", trafficClass));
-                sb.append(String.format("流标签: %d ", flowLabel));
-                sb.append(String.format("总长度: %d 字节 ", totalLength));
-                sb.append(String.format("下一个头: %d (%s) ", protocol, protocolName));
-                sb.append(String.format("跳数限制: %d ", ttl));
-            }
-
-            sb.append(String.format("源IP: %s ", sourceIP));
-            sb.append(String.format("目标IP: %s ", destIP));
-
-            if (transportInfo != null) {
-                sb.append(String.format("传输层: %s ", transportInfo));
-            }
-
-            if (payload != null) {
-                sb.append(String.format("数据长度: %d 字节 ", payload.length));
-            }
-
-            sb.append("================ ");
-            return sb.toString();
+            return String.format("IP Packet: %s -> %s protocol=%s size=%d", srcIP, dstIP, protocolName, totalLength);
         }
     }
 
@@ -401,8 +368,7 @@ public class PacketParser {
 
         @Override
         public String toString() {
-            return String.format("TCP: %d->%d seq=%d ack=%d flags=%s",
-                    srcPort, dstPort, sequenceNumber, ackNumber, getFlagsString());
+            return String.format("TCP Packet: %s:%d -> %s:%d seq=%d ack=%d flags=%s size=%d", ipPacket.srcIP, srcPort, ipPacket.dstIP, dstPort, sequenceNumber, ackNumber, getFlagsString(), payload == null ? 0 : payload.length);
         }
     }
 
