@@ -1,20 +1,20 @@
 # Core classes of SSLContext
-- javax.net.ssl.SSLContext
+- javax.net.ssl.SSLContext & javax.net.ssl.SSLContextSpi
 - public static SSLContext getInstance(String protocol)
 - public final void init(KeyManager[] km, TrustManager[] tm, SecureRandom random)
 - public final SSLSocketFactory getSocketFactory()
 - public final SSLServerSocketFactory getServerSocketFactory()
-- #KeyManager#
-- javax.net.ssl.KeyManager
+- #javax.net.ssl.KeyManager#
 - javax.net.ssl.X509KeyManager
 - javax.net.ssl.X509ExtendedKeyManager
 - sun.security.ssl.X509KeyManagerImpl
 - sun.security.ssl.SunX509KeyManagerImpl
-- #TrustManager#
-- javax.net.ssl.TrustManager
+- #javax.net.ssl.TrustManager#
 - javax.net.ssl.X509TrustManager
 - javax.net.ssl.X509ExtendedTrustManager
 - sun.security.ssl.X509TrustManagerImpl
+- javax.net.ssl.KeyManagerFactory & javax.net.ssl.KeyManagerFactorySpi
+- javax.net.ssl.TrustManagerFactory & javax.net.ssl.TrustManagerFactorySpi
 
 # Core class of SSL socket server:
 - javax.net.ssl.SSLServerSocketFactory
