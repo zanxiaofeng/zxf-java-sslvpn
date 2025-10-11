@@ -26,14 +26,17 @@ public class TCPHandler {
     public void handlePacket(PacketParser.TCPPacket tcpPacket) {
         String sessionKey = getSessionKey(tcpPacket);
 
-        if (activeSessions.containsKey(sessionKey)) {
+        TCPProxySession existing = activeSessions.get(sessionKey);
+        if (existing != null) {
             log.debug("会话已存在，提交数据包: {}", sessionKey);
-            activeSessions.get(sessionKey).submitPacket(tcpPacket);
+            existing.submitPacket(tcpPacket);
             return;
         }
 
         log.debug("会话不存在，创建新会话: {}", sessionKey);
-        TCPProxySession tcpProxySession = new TCPProxySession(tcpPacket, packetWriter);
+        TCPProxySession tcpProxySession = new TCPProxySession(tcpPacket, packetWriter, () -> {
+            activeSessions.remove(sessionKey);
+        });
         tcpProxySession.start();
         activeSessions.put(sessionKey, tcpProxySession);
     }
@@ -42,6 +45,6 @@ public class TCPHandler {
      * 生成会话键
      */
     private String getSessionKey(PacketParser.TCPPacket tcpPacket) {
-        return String.format("%s:%d->%s:%d", tcpPacket.ipPacket.srcIP,tcpPacket.ipPacket.srcPort, tcpPacket.srcPort, tcpPacket.dstPort);
+        return String.format("%s:%d->%s:%d", tcpPacket.ipPacket.srcIP, tcpPacket.srcPort, tcpPacket.ipPacket.dstIP, tcpPacket.dstPort);
     }
 }

@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -22,56 +23,66 @@ public class TCPProxySession {
     private final TCPConnectionState state;
     private BlockingQueue<PacketParser.TCPPacket> packetQueue;
     private final TunPacketWriter packetWriter;
+    private final Runnable cleanup;
 
-    public TCPProxySession(PacketParser.TCPPacket initalTCPPacket, TunPacketWriter packetWriter) {
+    public TCPProxySession(PacketParser.TCPPacket initalTCPPacket, TunPacketWriter packetWriter, Runnable cleanup) {
         this.state = new TCPConnectionState(initalTCPPacket.ipPacket);
         this.packetQueue = new LinkedBlockingQueue<>();
         this.packetQueue.offer(initalTCPPacket);
         this.packetWriter = packetWriter;
+        this.cleanup = cleanup;
     }
 
     public void start() {
         new Thread(() -> {
-            // 处理 TCP 握手
-            if (!establishProxyConnection()) {
-                return;
-            }
+            try {
+                // 处理 TCP 握手
+                if (!establishProxyConnection()) {
+                    return;
+                }
 
-            // 建立真实连接
-            if (!establishRealConnection()) {
-                return;
-            }
+                // 建立真实连接
+                if (!establishRealConnection()) {
+                    return;
+                }
 
-            // 启动数据转发
-            startForwarding();
-        }).start();
+                // 启动数据转发
+                startForwarding();
+            } catch (Exception ex) {
+                sendRST();
+                closeAndCleanup();
+            }
+        }, "tcp-proxy-handshake").start();
     }
 
 
-    private boolean establishProxyConnection() {
-        try {
-            // 等待 SYN 包
-            PacketParser.TCPPacket synPacket = waitForSYN();
-            if (synPacket == null) {
-                return false;
-            }
-
-            // 发送 SYN-ACK 响应
-            sendSYNACK(synPacket);
-
-            // 等待 ACK 完成握手
-            PacketParser.TCPPacket ackPacket = waitForACK();
-            if (ackPacket == null) {
-                return false;
-            }
-
-            // 握手完成
-            state.established = true;
-            return true;
-        } catch (Exception e) {
-            System.err.printf("TCP 握手失败 %s: %s ", e.getMessage());
+    private boolean establishProxyConnection() throws InterruptedException {
+        // 等待 SYN 包
+        PacketParser.TCPPacket synPacket = waitForSYN();
+        if (synPacket == null) {
             return false;
         }
+
+        // 发送 SYN-ACK 响应
+        sendSYNACK(synPacket);
+
+        // 等待 ACK 完成握手
+        PacketParser.TCPPacket ackPacket = waitForACK();
+        if (ackPacket == null) {
+            return false;
+        }
+
+        if (ackPacket.ackNumber != (state.serverNextSeq & 0xFFFFFFFFL)) {
+            return false;
+        }
+
+        if (ackPacket.sequenceNumber != (state.expectedClientSeq & 0xFFFFFFFFL)) {
+            return false;
+        }
+
+        // 握手完成
+        state.handshakeDone.set(true);
+        return true;
     }
 
 
@@ -80,15 +91,16 @@ public class TCPProxySession {
      */
     private PacketParser.TCPPacket waitForSYN() throws InterruptedException {
         log.info("等待 SYN 包...");
-        long startTime = System.currentTimeMillis();
-        while (System.currentTimeMillis() - startTime < 5000) { // 5秒超时
+        long endTime = System.currentTimeMillis() + 5000;
+        while (System.currentTimeMillis() < endTime) { // 5秒超时
             PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
-            if (packetData != null && packetData.hasFlag(PacketParser.TCPPacket.SYN)) {
+            if (packetData == null) continue;
+            if (packetData.hasFlag(PacketParser.TCPPacket.RST)) return null;
+            if (packetData.hasFlag(PacketParser.TCPPacket.SYN)) {
                 // 更新状态
                 log.info("收到 SYN 包 {}", packetData);
-                state.serverSeq = 100000;
-                state.serverAck = packetData.sequenceNumber + 1; // SYN 占用一个序列号
-                state.serverSynReceived = true;
+                state.clientInitialSeq = packetData.sequenceNumber & 0xFFFFFFFFL;
+                state.expectedClientSeq = state.clientInitialSeq + 1;
                 return packetData;
             }
         }
@@ -99,22 +111,18 @@ public class TCPProxySession {
      * 发送 SYN-ACK 响应
      */
     private void sendSYNACK(PacketParser.TCPPacket synPacket) {
-        try {
-            // 创建 SYN-ACK 包
-            byte flags = (byte) (PacketParser.TCPPacket.SYN | PacketParser.TCPPacket.ACK);
+        state.serverInitialSeq = ThreadLocalRandom.current().nextInt() & 0xFFFFFFFFL;
+        state.serverNextSeq = state.serverInitialSeq + 1;
 
-            // 创建响应包
-            byte[] responsePacket = PacketBuilder.createTCPPacket(synPacket.ipPacket.dstIP, synPacket.ipPacket.srcIP,
-                    synPacket.dstPort, synPacket.srcPort, state.serverSeq, state.serverAck, flags, 0, null);
+        // 创建 SYN-ACK 包
+        byte flags = (byte) (PacketParser.TCPPacket.SYN | PacketParser.TCPPacket.ACK);
 
-            log.info("发送 SYN-ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(responsePacket, responsePacket.length)));
-            packetWriter.writePacket(responsePacket);
+        // 创建响应包
+        byte[] responsePacket = PacketBuilder.createTCPPacket(synPacket.ipPacket.dstIP, synPacket.ipPacket.srcIP,
+                synPacket.dstPort, synPacket.srcPort, state.serverInitialSeq, state.expectedClientSeq, flags, state.serverWindow, null);
 
-            state.serverSeq += 1;
-            state.clientSynSent = true;
-        } catch (Exception e) {
-            System.err.printf("发送 SYN-ACK 失败: %s ", e.getMessage());
-        }
+        log.info("发送 SYN-ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(responsePacket, responsePacket.length)));
+        packetWriter.writePacket(responsePacket);
     }
 
 
@@ -123,12 +131,13 @@ public class TCPProxySession {
      */
     private PacketParser.TCPPacket waitForACK() throws InterruptedException {
         log.info("等待 ACK 包...");
-        long startTime = System.currentTimeMillis();
-        while (System.currentTimeMillis() - startTime < 5000) { // 5秒超时
+        long endTime = System.currentTimeMillis() + 5000;
+        while (System.currentTimeMillis() < endTime) { // 5秒超时
             PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
-            if (packetData != null && packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
+            if (packetData == null) continue;
+            if (packetData.hasFlag(PacketParser.TCPPacket.RST)) return null;
+            if (packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
                 log.info("收到 ACK 包 {}", packetData);
-                state.serverAck = packetData.sequenceNumber + 1;
                 return packetData;
             }
         }
@@ -145,6 +154,7 @@ public class TCPProxySession {
             return true;
         } catch (Exception e) {
             System.err.printf("建立真实连接失败: %s ", e.getMessage());
+            sendRST();
             return false;
         }
     }
@@ -162,6 +172,7 @@ public class TCPProxySession {
      * 处理来自 TUN 的数据包
      */
     public void submitPacket(PacketParser.TCPPacket tcpPacket) {
+        if (state.closed) return;
         packetQueue.offer(tcpPacket);
     }
 
@@ -175,22 +186,51 @@ public class TCPProxySession {
             log.info("=== 开始转发数据 ===");
             OutputStream realOutput = state.realSocket.getOutputStream();
 
-            while (!Thread.currentThread().isInterrupted()) {
+            while (!state.closed) {
                 PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
-                if (packetData != null) {
-                    log.info("收到数据包 {}", packetData);
-                    state.serverAck = packetData.sequenceNumber + packetData.payload.length;
-                    realOutput.write(packetData.payload);
-                    realOutput.flush();
+                if (packetData == null) {
+                    checkIdleTime();
+                    continue;
                 }
 
-                // 检查连接是否还活跃
-                if (state.realSocket.isClosed() || !state.realSocket.isConnected()) {
-                    break;
+                state.lastActivityTime = System.currentTimeMillis();
+
+                if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
+                    closeAndCleanup();
+                    return;
+                }
+
+                if ((packetData.sequenceNumber & 0xFFFFFFFFL) != (state.expectedClientSeq & 0xFFFFFFFFL)) {
+                    sendPureAck();
+                    continue;
+                }
+
+                int payloadLen = packetData.payload == null ? 0 : packetData.payload.length;
+                if (payloadLen > 0) {
+                    realOutput.write(packetData.payload, 0, payloadLen);
+                    realOutput.flush();
+                    state.expectedClientSeq += payloadLen;
+                }
+
+                if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
+                    state.expectedClientSeq += 1;
+                    state.clientFinReceived = true;
+                    sendPureAck();
+                } else if (payloadLen > 0 || packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
+                    sendPureAck();
+                }
+
+                if (state.serverFinSent && packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
+                    if ((packetData.ackNumber & 0xFFFFFFFFL) == (state.serverNextSeq & 0xFFFFFFFFL)) {
+                        state.clientFinAcked = true;
+                        return;
+                    }
                 }
             }
         } catch (Exception ex) {
             log.error("转发数据时发生错误: {}", ex.getMessage(), ex);
+            sendRST();
+            closeAndCleanup();
         }
     }
 
@@ -201,27 +241,82 @@ public class TCPProxySession {
         try {
             log.info("=== 开始读取数据 ===");
             InputStream realInput = state.realSocket.getInputStream();
-
-            while (!Thread.currentThread().isInterrupted()) {
-                byte[] buffer = new byte[4096];
-
+            byte[] buffer = new byte[4096];
+            while (!state.closed) {
                 int bytesRead = realInput.read(buffer);
                 if (bytesRead == -1) {
-                    break; // 连接关闭
+                    if (!state.serverFinSent) {
+                        sendFin();
+                    }
+                    return;
                 }
 
                 if (bytesRead > 0) {
-                    byte[] responsePacket = PacketBuilder.createTCPPacket(state.dstIP, state.srcIP,
-                            state.dstPort, state.srcPort, state.serverSeq, state.serverAck, (byte) 0, 0, null);
-                    packetWriter.writePacket(responsePacket);
-                    log.info("发送数据包 {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(responsePacket, responsePacket.length)));
+                    state.lastActivityTime = System.currentTimeMillis();
 
-                    // 更新连接活动
-                    state.serverSeq += bytesRead;
+                    byte[] payload = new byte[bytesRead];
+                    System.arraycopy(buffer, 0, payload, 0, bytesRead);
+
+                    sendDataToClient(payload);
                 }
             }
         } catch (Exception ex) {
             log.error("从真实连接读取数据失败: {}", ex.getMessage(), ex);
         }
+    }
+
+
+    private void sendPureAck() {
+        byte flags = (byte) (PacketParser.TCPPacket.ACK);
+        byte[] packet = PacketBuilder.createTCPPacket(state.dstIP, state.srcIP, state.dstPort, state.srcPort, state.serverNextSeq,
+                state.expectedClientSeq, flags, state.serverWindow, null);
+        packetWriter.writePacket(packet);
+    }
+
+    private void sendDataToClient(byte[] payload) {
+        if (payload == null || payload.length == 0) return;
+        byte flags = (byte) (PacketParser.TCPPacket.PSH | PacketParser.TCPPacket.ACK);
+        byte[] packet = PacketBuilder.createTCPPacket(state.dstIP, state.srcIP, state.dstPort, state.srcPort, state.serverNextSeq,
+                state.expectedClientSeq, flags, state.serverWindow, payload);
+        packetWriter.writePacket(packet);
+        state.serverNextSeq += payload.length;
+    }
+
+    private void sendFin() {
+        if (state.serverFinSent) return;
+        byte flags = (byte) (PacketParser.TCPPacket.FIN | PacketParser.TCPPacket.ACK);
+        byte[] packet = PacketBuilder.createTCPPacket(state.dstIP, state.srcIP, state.dstPort, state.srcPort, state.serverNextSeq,
+                state.expectedClientSeq, flags, state.serverWindow, null);
+        packetWriter.writePacket(packet);
+        state.serverNextSeq += 1;
+        state.serverFinSent = true;
+    }
+
+    private void sendRST() {
+        if (state.closed) return;
+        byte flags = (byte) (PacketParser.TCPPacket.RST | PacketParser.TCPPacket.ACK);
+        byte[] packet = PacketBuilder.createTCPPacket(state.dstIP, state.srcIP, state.dstPort, state.srcPort, state.serverNextSeq,
+                state.expectedClientSeq, flags, 0, null);
+        packetWriter.writePacket(packet);
+    }
+
+    private void checkIdleTime() {
+        if (System.currentTimeMillis() - state.lastActivityTime > 120000) {
+            sendFin();
+        }
+    }
+
+    private void closeAndCleanup() {
+        if (state.closed) return;
+        state.closed = true;
+
+        try {
+            if (state.realSocket != null) {
+                state.realSocket.close();
+            }
+        } catch (Exception ignore) {
+
+        }
+        cleanup.run();
     }
 }
