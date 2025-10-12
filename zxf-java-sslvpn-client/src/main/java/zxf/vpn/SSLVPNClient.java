@@ -1,18 +1,17 @@
-package zxf;
+package zxf.vpn;
 
 import lombok.extern.slf4j.Slf4j;
+import zxf.SSLSocketFactories;
 
 import javax.net.ssl.*;
 import java.io.*;
-import java.net.*;
-import java.util.concurrent.*;
 
 @Slf4j
 public class SSLVPNClient {
     private static final String VPN_SERVER_HOST = "localhost";
     private static final int VPN_SERVER_PORT = 8443;
 
-    public SSLSocket connectToVPNServer(String targetHost, int targetPort) throws Exception {
+    public SSLVPNConnection connectToVPNServer(String targetHost, int targetPort) throws Exception {
         try {
             SSLSocketFactory sslSocketFactory = SSLSocketFactories.sslSocketFactory();
             SSLSocket vpnSocket = (SSLSocket) sslSocketFactory.createSocket(VPN_SERVER_HOST, VPN_SERVER_PORT);
@@ -21,7 +20,7 @@ public class SSLVPNClient {
 
             requestConnection(vpnSocket, targetHost, targetPort);
 
-            return vpnSocket;
+            return new SSLVPNConnection(vpnSocket);
         } catch (Exception ex) {
             log.error("SSL VPN client, Exception when connect to SSL VPN Gateway {}", ex.getMessage(), ex);
             throw ex;

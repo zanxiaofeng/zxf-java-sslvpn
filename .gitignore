@@ -1,5 +1,9 @@
 .idea/
-zxf-java-sslvpn-client/.idea/
-zxf-java-sslvpn-server/.idea/
-zxf-java-sslvpn-client/target/
+zxf-java-sslvpn-common/target/
+zxf-java-sslvpn-test/target/
+zxf-java-sslvpn-echo-server/target/
 zxf-java-sslvpn-server/target/
+zxf-java-sslvpn-common/.idea/
+zxf-java-sslvpn-test/.idea/
+zxf-java-sslvpn-echo-server/.idea/
+zxf-java-sslvpn-server/.idea/

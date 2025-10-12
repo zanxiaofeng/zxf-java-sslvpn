@@ -1,8 +1,9 @@
 package zxf.socks;
 
 import lombok.extern.slf4j.Slf4j;
-import zxf.SSLVPNClient;
+import zxf.vpn.SSLVPNClient;
 import zxf.SocketUtils;
+import zxf.vpn.SSLVPNConnection;
 
 import java.io.*;
 import java.net.*;
@@ -133,12 +134,12 @@ public class Socks5Handler implements Runnable {
         log.info("SOCKS proxy - Client handler({}), Handle request, connect to {}:{}", SocketUtils.socketInfo(clientSocket), targetHost, targetPort);
 
         // 连接到目标服务器
-        try (Socket targetSocket = new SSLVPNClient().connectToVPNServer(targetHost, targetPort)) {
+        try (SSLVPNConnection targetSocket = new SSLVPNClient().connectToVPNServer(targetHost, targetPort)) {
             // 发送成功响应
-            sendSuccessResponse(output, targetSocket.getLocalAddress(), targetSocket.getLocalPort());
+            sendSuccessResponse(output, targetSocket.getSslSocket().getLocalAddress(), targetSocket.getSslSocket().getLocalPort());
 
             // 开始数据转发
-            SocketUtils.startTunnel(clientSocket, targetSocket);
+            SocketUtils.startTunnel(clientSocket, targetSocket.getSslSocket());
         } catch (Exception ex) {
             log.error("SOCKS proxy - Client handler({}), Handle request error {}", SocketUtils.socketInfo(clientSocket), ex.getMessage(), ex);
             sendErrorResponse(output, 0x05); // 连接被拒绝

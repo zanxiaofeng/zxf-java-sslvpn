@@ -2,7 +2,7 @@ package zxf.tunproxy.proxy.tcp;
 
 import lombok.extern.slf4j.Slf4j;
 import zxf.tunproxy.packet.PacketParser;
-import zxf.tunproxy.proxy.TunPacketWriter;
+import zxf.tunproxy.proxy.TunProxy;
 
 import java.util.Map;
 import java.util.concurrent.*;
@@ -12,12 +12,11 @@ import java.util.concurrent.*;
  */
 @Slf4j
 public class TCPHandler {
-    private final TunPacketWriter packetWriter;
-    private final Map<String, TCPProxySession> activeSessions;
+    private final TunProxy tunProxy;
+    private final Map<String, TCPProxySession> activeSessions = new ConcurrentHashMap<>();
 
-    public TCPHandler(TunPacketWriter packetWriter) {
-        this.packetWriter = packetWriter;
-        this.activeSessions = new ConcurrentHashMap<>();
+    public TCPHandler(TunProxy tunProxy) {
+        this.tunProxy = tunProxy;
     }
 
     /**
@@ -34,7 +33,7 @@ public class TCPHandler {
         }
 
         log.debug("会话不存在，创建新会话: {}", sessionKey);
-        TCPProxySession tcpProxySession = new TCPProxySession(tcpPacket, packetWriter, () -> {
+        TCPProxySession tcpProxySession = new TCPProxySession(tcpPacket, tunProxy, () -> {
             activeSessions.remove(sessionKey);
         });
         tcpProxySession.start();
