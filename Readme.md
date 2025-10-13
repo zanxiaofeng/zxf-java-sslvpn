@@ -48,3 +48,11 @@
 - ACK Number shows next expected byte: The ACK number in the receiver's packet indicates the sequence number of the next byte the receiver is expecting to receive.
 - Data integrity: This "positive acknowledgment" mechanism, combined with retransmission and timeouts, ensures that data is delivered reliably and in the correct order, even if packets are lost or arrive out of sequence.
 
+# Firewall
+- Firewalls are designed and deployed to prevent inbound traffic from entering a network and to stop outbound traffic from connecting to external resources that are noncompliant with an organization's security policies.
+## Inbound traffic versus outbound traffic
+- Inbound traffic requests. They originate from outside the network, such as an external user with a web browser, email client, server or application making requests -- like FTP and SSH -- or API calls to web services.
+- Outbound traffic requests. They originate from inside the network, destined for services on the internet or outside networks, such as a user visiting an external website or an internal mail server connecting to an external one.
+## Inbound vs. outbound firewall rules
+- Inbound firewall rules. They protect a network by blocking traffic known to be from malicious sources. This stops various attacks, such as malware and DDoS, from affecting internal resources.
+- Outbound firewall rules. They define the traffic allowed to leave a network and reach legitimate destinations. These rules also block requests sent to malicious websites and untrusted domains. They can also prevent data exfiltration by analyzing the contents of emails and files sent from a network.
