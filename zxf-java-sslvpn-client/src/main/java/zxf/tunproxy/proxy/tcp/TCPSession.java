@@ -5,7 +5,6 @@ import zxf.tunproxy.packet.PacketBuilder;
 import zxf.tunproxy.packet.PacketParser;
 import zxf.tunproxy.proxy.TunProxy;
 
-import java.net.Socket;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
@@ -13,28 +12,25 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
-public class TCPConnectionState {
-    // 连接信息
+public class TCPSession {
     public final String srcIP;
-    public final String dstIP;
     public final int srcPort;
+    public final String dstIP;
     public final int dstPort;
 
-    private BlockingQueue<PacketParser.TCPPacket> packetQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<PacketParser.TCPPacket> packetQueue = new LinkedBlockingQueue<>();
 
     public volatile long clientInitialSeq;
     public volatile long serverInitialSeq;
     public volatile long serverNextSeq;
     public volatile long expectedClientSeq;
-
     public volatile int serverWindow = 65525;
 
-
-    // 连接状态
     public volatile AtomicBoolean handshakeDone = new AtomicBoolean(false);
-    public volatile boolean clientFinReceived = false;
-    public volatile boolean serverFinSent = false;
-    public volatile boolean clientFinAcked = false;
+    public volatile boolean clientFINReceived = false;
+    public volatile boolean clientRSTReceived = false;
+    public volatile boolean serverFINSent = false;
+    public volatile boolean clientFINAcked = false;
     public volatile boolean closed = false;
 
 
@@ -42,7 +38,7 @@ public class TCPConnectionState {
 
     TunProxy tunProxy;
 
-    public TCPConnectionState(PacketParser.TCPPacket initialPacket, TunProxy tunProxy) {
+    public TCPSession(PacketParser.TCPPacket initialPacket, TunProxy tunProxy) {
         this.srcIP = initialPacket.ipPacket.srcIP;
         this.srcPort = initialPacket.srcPort;
         this.dstIP = initialPacket.ipPacket.dstIP;
@@ -51,10 +47,9 @@ public class TCPConnectionState {
         this.packetQueue.offer(initialPacket);
     }
 
-    public PacketParser.TCPPacket readPacket() throws InterruptedException {
-        PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
-        lastActivityTime = System.currentTimeMillis();
-        return packetData;
+    public void start(Runnable cleanup) {
+        TCPSessionWorker session = new TCPSessionWorker(this, cleanup);
+        session.start();
     }
 
 
@@ -73,7 +68,10 @@ public class TCPConnectionState {
         while (System.currentTimeMillis() < endTime) { // 5秒超时
             PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
             if (packetData == null) continue;
-            if (packetData.hasFlag(PacketParser.TCPPacket.RST)) return null;
+            if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
+                clientRSTReceived = true;
+                throw new SessionResetException();
+            }
             if (packetData.hasFlag(PacketParser.TCPPacket.SYN) & !packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
                 // 更新状态
                 clientInitialSeq = packetData.sequenceNumber & 0xFFFFFFFFL;
@@ -83,6 +81,51 @@ public class TCPConnectionState {
             }
         }
         return null;
+    }
+
+    /**
+     * 等待 ACK 包
+     */
+    public PacketParser.TCPPacket waitForACK() throws InterruptedException, SessionResetException {
+        log.info("等待 ACK 包...");
+        long endTime = System.currentTimeMillis() + 5000;
+        while (System.currentTimeMillis() < endTime) { // 5秒超时
+            PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
+            if (packetData == null) continue;
+            if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
+                clientRSTReceived = true;
+                throw new SessionResetException();
+            }
+            if (packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
+                log.info("收到 ACK 包 {}", packetData);
+                return packetData;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 等待 ACK 包
+     */
+    public PacketParser.TCPPacket waitForData() throws InterruptedException, SessionException {
+        log.info("等待 DATA 包...");
+        PacketParser.TCPPacket packetData = packetQueue.poll(1000, TimeUnit.SECONDS);
+        if (packetData == null) return null;
+        if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
+            throw new SessionResetException();
+        }
+        if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
+            clientFINReceived = true;
+            throw new SessionEndException();
+        }
+        if (packetData.hasFlag(PacketParser.TCPPacket.ACK) && serverFINSent) {
+            if ((packetData.ackNumber & 0xFFFFFFFFL) == (serverNextSeq & 0xFFFFFFFFL)) {
+                clientFINAcked = true;
+                throw new SessionEndException();
+            }
+        }
+        log.info("收到 DATA 包 {}", packetData);
+        return packetData;
     }
 
     /**
@@ -104,25 +147,6 @@ public class TCPConnectionState {
         tunProxy.submitPacket(responsePacket);
     }
 
-
-    /**
-     * 等待 ACK 包
-     */
-    public PacketParser.TCPPacket waitForACK() throws InterruptedException {
-        log.info("等待 ACK 包...");
-        long endTime = System.currentTimeMillis() + 5000;
-        while (System.currentTimeMillis() < endTime) { // 5秒超时
-            PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
-            if (packetData == null) continue;
-            if (packetData.hasFlag(PacketParser.TCPPacket.RST)) return null;
-            if (packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
-                log.info("收到 ACK 包 {}", packetData);
-                return packetData;
-            }
-        }
-        return null;
-    }
-
     public void sendPureAck() throws Exception {
         byte flags = (byte) (PacketParser.TCPPacket.ACK);
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
@@ -130,7 +154,7 @@ public class TCPConnectionState {
         tunProxy.submitPacket(packet);
     }
 
-    public void sendDataToClient(byte[] payload) throws Exception {
+    public void sendData(byte[] payload) throws Exception {
         if (payload == null || payload.length == 0) return;
         byte flags = (byte) (PacketParser.TCPPacket.PSH | PacketParser.TCPPacket.ACK);
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
@@ -141,13 +165,13 @@ public class TCPConnectionState {
     }
 
     public void sendFin() throws Exception {
-        if (serverFinSent) return;
+        if (serverFINSent) return;
         byte flags = (byte) (PacketParser.TCPPacket.FIN | PacketParser.TCPPacket.ACK);
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
                 expectedClientSeq, flags, serverWindow, null);
         tunProxy.submitPacket(packet);
         serverNextSeq += 1;
-        serverFinSent = true;
+        serverFINSent = true;
     }
 
     public void sendRST() throws Exception {
@@ -158,9 +182,15 @@ public class TCPConnectionState {
         tunProxy.submitPacket(packet);
     }
 
+    public abstract static class SessionException extends Exception {
 
-    public void start(Runnable cleanup) {
-        TCPProxySession session = new TCPProxySession(this, cleanup);
-        session.start();
+    }
+
+    public static class SessionEndException extends SessionException {
+
+    }
+
+    public static class SessionResetException extends SessionException {
+
     }
 }

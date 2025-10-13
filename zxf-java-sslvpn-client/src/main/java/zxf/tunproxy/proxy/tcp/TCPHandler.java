@@ -13,7 +13,7 @@ import java.util.concurrent.*;
 @Slf4j
 public class TCPHandler {
     private final TunProxy tunProxy;
-    private final Map<String, TCPConnectionState> activeSessions = new ConcurrentHashMap<>();
+    private final Map<String, TCPSession> activeSessions = new ConcurrentHashMap<>();
 
     public TCPHandler(TunProxy tunProxy) {
         this.tunProxy = tunProxy;
@@ -25,7 +25,7 @@ public class TCPHandler {
     public void handlePacket(PacketParser.TCPPacket tcpPacket) {
         String sessionKey = getSessionKey(tcpPacket);
 
-        TCPConnectionState existing = activeSessions.get(sessionKey);
+        TCPSession existing = activeSessions.get(sessionKey);
         if (existing != null) {
             log.debug("会话已存在，提交数据包: {}", sessionKey);
             existing.submitPacket(tcpPacket);
@@ -33,11 +33,11 @@ public class TCPHandler {
         }
 
         log.debug("会话不存在，创建新会话: {}", sessionKey);
-        TCPConnectionState tcpProxySession = new TCPConnectionState(tcpPacket, tunProxy);
-        tcpProxySession.start(() -> {
+        TCPSession tcpSession = new TCPSession(tcpPacket, tunProxy);
+        tcpSession.start(() -> {
             activeSessions.remove(sessionKey);
         });
-        activeSessions.put(sessionKey, tcpProxySession);
+        activeSessions.put(sessionKey, tcpSession);
     }
 
     /**

@@ -5,20 +5,16 @@ import zxf.tunproxy.packet.PacketParser;
 import zxf.vpn.SSLVPNClient;
 import zxf.vpn.SSLVPNConnection;
 
-
-/**
- * TCP 代理会话
- */
 @Slf4j
-public class TCPProxySession {
-    private final Thread readThread = new Thread(this::readFromRealConnection);
-    private final Thread writeThread = new Thread(this::writeToRealConnection);
-    private final TCPConnectionState state;
+public class TCPSessionWorker {
+    private final Thread readThread = new Thread(this::readFromRealConnection, "tcp-session-worker-reader");
+    private final Thread writeThread = new Thread(this::writeToRealConnection, "tcp-session-worker-writer");
+    private final TCPSession tcpSession;
     private final Runnable cleanup;
     private SSLVPNConnection realSocket;
 
-    public TCPProxySession(TCPConnectionState state, Runnable cleanup) {
-        this.state = state;
+    public TCPSessionWorker(TCPSession tcpSession, Runnable cleanup) {
+        this.tcpSession = tcpSession;
         this.cleanup = cleanup;
     }
 
@@ -41,42 +37,42 @@ public class TCPProxySession {
             } catch (Exception ex) {
                 closeAndCleanup();
             }
-        }, "tcp-proxy-handshake").start();
+        }, "tcp-session-worker-handshake").start();
     }
 
 
     private boolean establishProxyConnection() throws Exception {
         // 等待 SYN 包
-        PacketParser.TCPPacket synPacket = state.waitForSYN();
+        PacketParser.TCPPacket synPacket = tcpSession.waitForSYN();
         if (synPacket == null) {
             return false;
         }
 
         // 发送 SYN-ACK 响应
-        state.sendSYNACK(synPacket);
+        tcpSession.sendSYNACK(synPacket);
 
         // 等待 ACK 完成握手
-        PacketParser.TCPPacket ackPacket = state.waitForACK();
+        PacketParser.TCPPacket ackPacket = tcpSession.waitForACK();
         if (ackPacket == null) {
             return false;
         }
 
-        if (ackPacket.ackNumber != (state.serverNextSeq & 0xFFFFFFFFL)) {
+        if (ackPacket.ackNumber != (tcpSession.serverNextSeq & 0xFFFFFFFFL)) {
             return false;
         }
 
-        if (ackPacket.sequenceNumber != (state.expectedClientSeq & 0xFFFFFFFFL)) {
+        if (ackPacket.sequenceNumber != (tcpSession.expectedClientSeq & 0xFFFFFFFFL)) {
             return false;
         }
 
         // 握手完成
-        state.handshakeDone.set(true);
+        tcpSession.handshakeDone.set(true);
         return true;
     }
 
     private void resetProxyConnection() {
         try {
-            state.sendRST();
+            tcpSession.sendRST();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -84,8 +80,8 @@ public class TCPProxySession {
 
     private void closeProxyConnection() {
         try {
-            if (!state.serverFinSent) {
-                state.sendFin();
+            if (!tcpSession.serverFINSent) {
+                tcpSession.sendFin();
             }
         } catch (Exception ex) {
             throw new RuntimeException(ex);
@@ -98,8 +94,8 @@ public class TCPProxySession {
      */
     private boolean establishRealConnection() {
         try {
-            log.info("建立真实连接: {}:{} ", state.dstIP, state.dstPort);
-            realSocket = new SSLVPNClient().connectToVPNServer("127.0.0.1", state.dstPort);
+            log.info("建立真实连接: {}:{} ", tcpSession.dstIP, tcpSession.dstPort);
+            realSocket = new SSLVPNClient().connectToVPNServer("127.0.0.1", tcpSession.dstPort);
             return true;
         } catch (Exception e) {
             System.err.printf("建立真实连接失败: %s ", e.getMessage());
@@ -135,44 +131,33 @@ public class TCPProxySession {
         // 处理来自 TUN 设备的数据包
         try {
             log.info("=== 开始转发数据 ===");
-
-            while (!state.closed) {
-                PacketParser.TCPPacket packetData = state.readPacket();
+            while (!tcpSession.closed) {
+                PacketParser.TCPPacket packetData = tcpSession.waitForData();
                 if (packetData == null) {
                     checkIdleTime();
                     continue;
                 }
 
-                if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
-                    closeAndCleanup();
-                    return;
-                }
-
-                if ((packetData.sequenceNumber & 0xFFFFFFFFL) != (state.expectedClientSeq & 0xFFFFFFFFL)) {
-                    state.sendPureAck();
+                if ((packetData.sequenceNumber & 0xFFFFFFFFL) != (tcpSession.expectedClientSeq & 0xFFFFFFFFL)) {
+                    tcpSession.sendPureAck();
                     continue;
                 }
 
                 int payloadLen = packetData.payload == null ? 0 : packetData.payload.length;
                 if (payloadLen > 0) {
                     realSocket.write(packetData.payload, 0, payloadLen);
-                    state.expectedClientSeq += payloadLen;
+                    tcpSession.expectedClientSeq += payloadLen;
                 }
 
                 if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
-                    state.expectedClientSeq += 1;
-                    state.clientFinReceived = true;
-                    state.sendPureAck();
+                    tcpSession.expectedClientSeq += 1;
+
+                    tcpSession.sendPureAck();
                 } else if (payloadLen > 0 || packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
-                    state.sendPureAck();
+                    tcpSession.sendPureAck();
                 }
 
-                if (state.serverFinSent && packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
-                    if ((packetData.ackNumber & 0xFFFFFFFFL) == (state.serverNextSeq & 0xFFFFFFFFL)) {
-                        state.clientFinAcked = true;
-                        return;
-                    }
-                }
+
             }
         } catch (Exception ex) {
             log.error("转发数据时发生错误: {}", ex.getMessage(), ex);
@@ -187,7 +172,7 @@ public class TCPProxySession {
         try {
             log.info("=== 开始读取数据 ===");
             byte[] buffer = new byte[4096];
-            while (!state.closed) {
+            while (!tcpSession.closed) {
                 int bytesRead = realSocket.read(buffer);
                 if (bytesRead == -1) {
                     closeProxyConnection();
@@ -197,7 +182,7 @@ public class TCPProxySession {
                 if (bytesRead > 0) {
                     byte[] payload = new byte[bytesRead];
                     System.arraycopy(buffer, 0, payload, 0, bytesRead);
-                    state.sendDataToClient(payload);
+                    tcpSession.sendData(payload);
                 }
             }
         } catch (Exception ex) {
@@ -208,14 +193,14 @@ public class TCPProxySession {
 
 
     private void checkIdleTime() throws Exception {
-        if (System.currentTimeMillis() - state.lastActivityTime > 120000) {
-            state.sendFin();
+        if (System.currentTimeMillis() - tcpSession.lastActivityTime > 120000) {
+            tcpSession.sendFin();
         }
     }
 
     private void closeAndCleanup() {
-        if (state.closed) return;
-        state.closed = true;
+        if (tcpSession.closed) return;
+        tcpSession.closed = true;
         resetProxyConnection();
         closeRealConnection();
         cleanup.run();
