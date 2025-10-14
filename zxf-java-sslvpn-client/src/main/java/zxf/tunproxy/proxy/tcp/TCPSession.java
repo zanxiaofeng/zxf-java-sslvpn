@@ -98,6 +98,16 @@ public class TCPSession {
             }
             if (packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
                 log.info("收到 ACK 包 {}", packetData);
+                if (packetData.ackNumber != (serverNextSeq & 0xFFFFFFFFL)) {
+                    return null;
+                }
+
+                if (packetData.sequenceNumber != (expectedClientSeq & 0xFFFFFFFFL)) {
+                    return null;
+                }
+
+                // 握手完成
+                handshakeDone.set(true);
                 return packetData;
             }
         }
@@ -181,6 +191,17 @@ public class TCPSession {
                 expectedClientSeq, flags, 0, null);
         tunProxy.submitPacket(packet);
     }
+
+    public void close() {
+        try {
+            if (!serverFINSent) {
+                sendFin();
+            }
+        } catch (Exception ignore) {
+
+        }
+    }
+
 
     public abstract static class SessionException extends Exception {
 

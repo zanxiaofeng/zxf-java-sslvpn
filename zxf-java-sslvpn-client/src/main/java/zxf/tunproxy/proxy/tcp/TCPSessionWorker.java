@@ -57,16 +57,7 @@ public class TCPSessionWorker {
             return false;
         }
 
-        if (ackPacket.ackNumber != (tcpSession.serverNextSeq & 0xFFFFFFFFL)) {
-            return false;
-        }
 
-        if (ackPacket.sequenceNumber != (tcpSession.expectedClientSeq & 0xFFFFFFFFL)) {
-            return false;
-        }
-
-        // 握手完成
-        tcpSession.handshakeDone.set(true);
         return true;
     }
 
@@ -79,13 +70,7 @@ public class TCPSessionWorker {
     }
 
     private void closeProxyConnection() {
-        try {
-            if (!tcpSession.serverFINSent) {
-                tcpSession.sendFin();
-            }
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
+       tcpSession.close();
     }
 
 
