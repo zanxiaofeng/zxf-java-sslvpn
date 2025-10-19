@@ -71,7 +71,7 @@ public class TCPSessionWorker {
     }
 
     private void closeProxyConnection() {
-       proxyConnection.close();
+        proxyConnection.close();
     }
 
 
@@ -81,7 +81,7 @@ public class TCPSessionWorker {
     private boolean establishRealConnection() {
         try {
             log.info("建立真实连接: {}:{} ", proxyConnection.dstIP, proxyConnection.dstPort);
-            realConnection = new SSLVPNClient().connectToVPNServer("127.0.0.1", proxyConnection.dstPort);
+            realConnection = SSLVPNClient.connectToVPNServer("127.0.0.1", proxyConnection.dstPort);
             return true;
         } catch (Exception e) {
             System.err.printf("建立真实连接失败: %s ", e.getMessage());

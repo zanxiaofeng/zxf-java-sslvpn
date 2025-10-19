@@ -11,7 +11,7 @@ public class SSLVPNClient {
     private static final String VPN_SERVER_HOST = "localhost";
     private static final int VPN_SERVER_PORT = 8443;
 
-    public SSLVPNConnection connectToVPNServer(String targetHost, int targetPort) throws Exception {
+    public static SSLVPNConnection connectToVPNServer(String targetHost, int targetPort) throws Exception {
         try {
             SSLSocketFactory sslSocketFactory = SSLSocketFactories.sslSocketFactory();
             SSLSocket vpnSocket = (SSLSocket) sslSocketFactory.createSocket(VPN_SERVER_HOST, VPN_SERVER_PORT);

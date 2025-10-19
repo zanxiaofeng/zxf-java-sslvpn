@@ -134,7 +134,7 @@ public class Socks5Handler implements Runnable {
         log.info("SOCKS proxy - Client handler({}), Handle request, connect to {}:{}", SocketUtils.socketInfo(clientSocket), targetHost, targetPort);
 
         // 连接到目标服务器
-        try (SSLVPNConnection targetSocket = new SSLVPNClient().connectToVPNServer(targetHost, targetPort)) {
+        try (SSLVPNConnection targetSocket = SSLVPNClient.connectToVPNServer(targetHost, targetPort)) {
             // 发送成功响应
             sendSuccessResponse(output, targetSocket.getSslSocket().getLocalAddress(), targetSocket.getSslSocket().getLocalPort());
 
