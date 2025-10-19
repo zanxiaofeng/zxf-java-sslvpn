@@ -96,15 +96,12 @@ public class TCPSession {
                 throw new SessionResetException();
             }
             if (packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
-                log.info("收到 ACK 包 {}", packetData);
-                if (packetData.ackNumber != (serverNextSeq & 0xFFFFFFFFL)) {
+                if (packetData.ackNumber != serverNextSeq || packetData.sequenceNumber != expectedClientSeq) {
+                    log.info("收到 无效ACK 包 {}", packetData);
                     return null;
                 }
 
-                if (packetData.sequenceNumber != (expectedClientSeq & 0xFFFFFFFFL)) {
-                    return null;
-                }
-
+                log.info("收到 有效ACK 包 {}", packetData);
                 // 握手完成
                 handshakeDone.set(true);
                 return packetData;
@@ -116,7 +113,7 @@ public class TCPSession {
     /**
      * 等待 ACK 包
      */
-    public PacketParser.TCPPacket waitForData() throws InterruptedException, SessionException {
+    public PacketParser.TCPPacket waitForData() throws Exception {
         log.info("等待 DATA 包...");
         PacketParser.TCPPacket packetData = packetQueue.poll(1000, TimeUnit.SECONDS);
         if (packetData == null) return null;
@@ -133,6 +130,12 @@ public class TCPSession {
                 throw new SessionEndException();
             }
         }
+
+        if (packetData.sequenceNumber != expectedClientSeq) {
+            sendPureAck();
+            return waitForData();
+        }
+
         log.info("收到 DATA 包 {}", packetData);
         return packetData;
     }

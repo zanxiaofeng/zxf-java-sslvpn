@@ -124,10 +124,7 @@ public class TCPSessionWorker {
                     continue;
                 }
 
-                if ((packetData.sequenceNumber & 0xFFFFFFFFL) != (proxyConnection.expectedClientSeq & 0xFFFFFFFFL)) {
-                    proxyConnection.sendPureAck();
-                    continue;
-                }
+
 
                 int payloadLen = packetData.payload == null ? 0 : packetData.payload.length;
                 if (payloadLen > 0) {
