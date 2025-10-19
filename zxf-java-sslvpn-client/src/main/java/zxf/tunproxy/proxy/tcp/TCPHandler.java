@@ -12,8 +12,8 @@ import java.util.concurrent.*;
  */
 @Slf4j
 public class TCPHandler {
-    private final TunProxy tunProxy;
     private final Map<String, TCPSession> activeSessions = new ConcurrentHashMap<>();
+    private final TunProxy tunProxy;
 
     public TCPHandler(TunProxy tunProxy) {
         this.tunProxy = tunProxy;

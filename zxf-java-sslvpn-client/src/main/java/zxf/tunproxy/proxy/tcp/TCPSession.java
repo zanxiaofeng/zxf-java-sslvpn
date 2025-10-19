@@ -13,12 +13,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class TCPSession {
+    private final BlockingQueue<PacketParser.TCPPacket> packetQueue = new LinkedBlockingQueue<>();
+
     public final String srcIP;
     public final int srcPort;
     public final String dstIP;
     public final int dstPort;
 
-    private final BlockingQueue<PacketParser.TCPPacket> packetQueue = new LinkedBlockingQueue<>();
+    private TunProxy tunProxy;
 
     public volatile long clientInitialSeq;
     public volatile long serverInitialSeq;
@@ -33,18 +35,15 @@ public class TCPSession {
     public volatile boolean clientFINAcked = false;
     public volatile boolean closed = false;
 
-
     public volatile long lastActivityTime = System.currentTimeMillis();
-
-    TunProxy tunProxy;
 
     public TCPSession(PacketParser.TCPPacket initialPacket, TunProxy tunProxy) {
         this.srcIP = initialPacket.ipPacket.srcIP;
         this.srcPort = initialPacket.srcPort;
         this.dstIP = initialPacket.ipPacket.dstIP;
         this.dstPort = initialPacket.dstPort;
-        this.tunProxy = tunProxy;
         this.packetQueue.offer(initialPacket);
+        this.tunProxy = tunProxy;
     }
 
     public void start(Runnable cleanup) {

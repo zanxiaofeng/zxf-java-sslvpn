@@ -11,17 +11,17 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 @Slf4j
 public class TunProxy implements AutoCloseable {
+    private final BlockingQueue<byte[]> packetQueue = new LinkedBlockingQueue<>();
+    private final Thread readerThread = new Thread(this::readLoop, "tun-proxy-reader");
+    private final Thread writerThread = new Thread(this::writeLoop, "tun-proxy-writer");
     private final int tunFd;
     private final TCPHandler tcpHandler;
-    private final BlockingQueue<byte[]> packetQueue = new LinkedBlockingQueue<>();
-    private final Thread readerThread = new Thread(this::readLoop, "tun-packet-writer");
-    private final Thread writerThread = new Thread(this::writeLoop, "tun-packet-writer");
 
     public TunProxy(int tunFd) {
         this.tunFd = tunFd;
+        this.tcpHandler = new TCPHandler(this);
         readerThread.start();
         writerThread.start();
-        tcpHandler = new TCPHandler(this);
     }
 
     public static TunProxy open() throws Exception {
@@ -55,7 +55,7 @@ public class TunProxy implements AutoCloseable {
     /**
      * 读取循环
      */
-    public void readLoop() {
+    private void readLoop() {
         while (true) {
             try {
                 PacketParser.IPPacket ipPacket = readPacket();
@@ -117,7 +117,7 @@ public class TunProxy implements AutoCloseable {
         return ipPacket;
     }
 
-    public void writePacket(byte[] packet) throws Exception {
+    private void writePacket(byte[] packet) throws Exception {
         TunDevice.writePacket(tunFd, packet);
     }
 }
