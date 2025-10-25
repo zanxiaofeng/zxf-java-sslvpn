@@ -57,11 +57,79 @@ public class TCPSession {
         packetQueue.offer(tcpPacket);
     }
 
+    public PacketParser.TCPPacket waitForData() throws Exception {
+        log.info("等待 DATA 包...");
+        PacketParser.TCPPacket packetData = packetQueue.poll(1000, TimeUnit.SECONDS);
+        if (packetData == null) return null;
+        if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
+            throw new SessionException.SessionResetException();
+        }
+        if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
+            clientFINReceived = true;
+            throw new SessionException.SessionEndException();
+        }
+        if (packetData.hasFlag(PacketParser.TCPPacket.ACK) && serverFINSent) {
+            if ((packetData.ackNumber & 0xFFFFFFFFL) == (serverNextSeq & 0xFFFFFFFFL)) {
+                clientFINAcked = true;
+                throw new SessionException.SessionEndException();
+            }
+        }
 
-    /**
-     * 等待 SYN 包
-     */
-    public PacketParser.TCPPacket waitForSYN() throws Exception {
+        if (packetData.sequenceNumber != expectedClientSeq) {
+            sendPureAck();
+            return waitForData();
+        }
+
+        log.info("收到 DATA 包 {}", packetData);
+        return packetData;
+    }
+
+    public void sendData(byte[] payload) throws Exception {
+        if (payload == null || payload.length == 0) return;
+        byte flags = (byte) (PacketParser.TCPPacket.PSH | PacketParser.TCPPacket.ACK);
+        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
+                expectedClientSeq, flags, serverWindow, payload);
+        tunProxy.submitPacket(packet);
+        lastActivityTime = System.currentTimeMillis();
+        serverNextSeq += payload.length;
+    }
+
+    public void sendPureAck() throws Exception {
+        byte flags = (byte) (PacketParser.TCPPacket.ACK);
+        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
+                expectedClientSeq, flags, serverWindow, null);
+        tunProxy.submitPacket(packet);
+    }
+
+    public Boolean startSession() throws Exception {
+        PacketParser.TCPPacket synPacket = waitForSYN();
+        if (synPacket == null) {
+            return false;
+        }
+
+        // 发送 SYN-ACK 响应
+        sendSYNACK(synPacket);
+
+        // 等待 ACK 完成握手
+        PacketParser.TCPPacket ackPacket = waitForACK();
+        if (ackPacket == null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public void closeSession() {
+        try {
+            if (!serverFINSent) {
+                sendFin();
+            }
+        } catch (Exception ignore) {
+
+        }
+    }
+
+    private PacketParser.TCPPacket waitForSYN() throws Exception {
         log.info("等待 SYN 包...");
         long endTime = System.currentTimeMillis() + 5000;
         while (System.currentTimeMillis() < endTime) { // 5秒超时
@@ -69,7 +137,7 @@ public class TCPSession {
             if (packetData == null) continue;
             if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
                 clientRSTReceived = true;
-                throw new SessionResetException();
+                throw new SessionException.SessionResetException();
             }
             if (packetData.hasFlag(PacketParser.TCPPacket.SYN) & !packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
                 // 更新状态
@@ -82,10 +150,7 @@ public class TCPSession {
         return null;
     }
 
-    /**
-     * 等待 ACK 包
-     */
-    public PacketParser.TCPPacket waitForACK() throws InterruptedException, SessionResetException {
+    private PacketParser.TCPPacket waitForACK() throws InterruptedException, SessionException.SessionResetException {
         log.info("等待 ACK 包...");
         long endTime = System.currentTimeMillis() + 5000;
         while (System.currentTimeMillis() < endTime) { // 5秒超时
@@ -93,7 +158,7 @@ public class TCPSession {
             if (packetData == null) continue;
             if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
                 clientRSTReceived = true;
-                throw new SessionResetException();
+                throw new SessionException.SessionResetException();
             }
             if (packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
                 if (packetData.ackNumber != serverNextSeq || packetData.sequenceNumber != expectedClientSeq) {
@@ -110,40 +175,7 @@ public class TCPSession {
         return null;
     }
 
-    /**
-     * 等待 ACK 包
-     */
-    public PacketParser.TCPPacket waitForData() throws Exception {
-        log.info("等待 DATA 包...");
-        PacketParser.TCPPacket packetData = packetQueue.poll(1000, TimeUnit.SECONDS);
-        if (packetData == null) return null;
-        if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
-            throw new SessionResetException();
-        }
-        if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
-            clientFINReceived = true;
-            throw new SessionEndException();
-        }
-        if (packetData.hasFlag(PacketParser.TCPPacket.ACK) && serverFINSent) {
-            if ((packetData.ackNumber & 0xFFFFFFFFL) == (serverNextSeq & 0xFFFFFFFFL)) {
-                clientFINAcked = true;
-                throw new SessionEndException();
-            }
-        }
-
-        if (packetData.sequenceNumber != expectedClientSeq) {
-            sendPureAck();
-            return waitForData();
-        }
-
-        log.info("收到 DATA 包 {}", packetData);
-        return packetData;
-    }
-
-    /**
-     * 发送 SYN-ACK 响应
-     */
-    public void sendSYNACK(PacketParser.TCPPacket synPacket) throws Exception {
+    private void sendSYNACK(PacketParser.TCPPacket synPacket) throws Exception {
         serverInitialSeq = ThreadLocalRandom.current().nextInt() & 0xFFFFFFFFL;
         serverNextSeq = serverInitialSeq + 1;
 
@@ -159,24 +191,7 @@ public class TCPSession {
         tunProxy.submitPacket(responsePacket);
     }
 
-    public void sendPureAck() throws Exception {
-        byte flags = (byte) (PacketParser.TCPPacket.ACK);
-        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
-                expectedClientSeq, flags, serverWindow, null);
-        tunProxy.submitPacket(packet);
-    }
-
-    public void sendData(byte[] payload) throws Exception {
-        if (payload == null || payload.length == 0) return;
-        byte flags = (byte) (PacketParser.TCPPacket.PSH | PacketParser.TCPPacket.ACK);
-        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
-                expectedClientSeq, flags, serverWindow, payload);
-        tunProxy.submitPacket(packet);
-        lastActivityTime = System.currentTimeMillis();
-        serverNextSeq += payload.length;
-    }
-
-    public void sendFin() throws Exception {
+    private void sendFin() throws Exception {
         if (serverFINSent) return;
         byte flags = (byte) (PacketParser.TCPPacket.FIN | PacketParser.TCPPacket.ACK);
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
@@ -186,34 +201,11 @@ public class TCPSession {
         serverFINSent = true;
     }
 
-    public void sendRST() throws Exception {
+    private void sendRST() throws Exception {
         if (closed) return;
         byte flags = (byte) (PacketParser.TCPPacket.RST | PacketParser.TCPPacket.ACK);
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
                 expectedClientSeq, flags, 0, null);
         tunProxy.submitPacket(packet);
-    }
-
-    public void close() {
-        try {
-            if (!serverFINSent) {
-                sendFin();
-            }
-        } catch (Exception ignore) {
-
-        }
-    }
-
-
-    public abstract static class SessionException extends Exception {
-
-    }
-
-    public static class SessionEndException extends SessionException {
-
-    }
-
-    public static class SessionResetException extends SessionException {
-
     }
 }

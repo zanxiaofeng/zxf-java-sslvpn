@@ -13,7 +13,6 @@ public class TCPSessionWorker {
     private SSLVPNConnection realConnection;
     private final Runnable cleanup;
 
-
     public TCPSessionWorker(TCPSession proxyConnection, Runnable cleanup) {
         this.proxyConnection = proxyConnection;
         this.cleanup = cleanup;
@@ -43,41 +42,13 @@ public class TCPSessionWorker {
 
 
     private boolean establishProxyConnection() throws Exception {
-        // 等待 SYN 包
-        PacketParser.TCPPacket synPacket = proxyConnection.waitForSYN();
-        if (synPacket == null) {
-            return false;
-        }
-
-        // 发送 SYN-ACK 响应
-        proxyConnection.sendSYNACK(synPacket);
-
-        // 等待 ACK 完成握手
-        PacketParser.TCPPacket ackPacket = proxyConnection.waitForACK();
-        if (ackPacket == null) {
-            return false;
-        }
-
-
-        return true;
-    }
-
-    private void resetProxyConnection() {
-        try {
-            proxyConnection.sendRST();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
+        return proxyConnection.startSession();
     }
 
     private void closeProxyConnection() {
-        proxyConnection.close();
+        proxyConnection.closeSession();
     }
 
-
-    /**
-     * 建立真实 TCP 连接
-     */
     private boolean establishRealConnection() {
         try {
             log.info("建立真实连接: {}:{} ", proxyConnection.dstIP, proxyConnection.dstPort);
@@ -85,14 +56,10 @@ public class TCPSessionWorker {
             return true;
         } catch (Exception e) {
             System.err.printf("建立真实连接失败: %s ", e.getMessage());
-            resetProxyConnection();
             return false;
         }
     }
 
-    /**
-     * 建立真实 TCP 连接
-     */
     private void closeRealConnection() {
         try {
             realConnection.close();
@@ -116,14 +83,13 @@ public class TCPSessionWorker {
     private void writeToRealConnection() {
         // 处理来自 TUN 设备的数据包
         try {
-            log.info("=== 开始转发数据 ===");
+            log.info("=== 开始转发数据到真实连接 ===");
             while (!proxyConnection.closed) {
                 PacketParser.TCPPacket packetData = proxyConnection.waitForData();
                 if (packetData == null) {
                     checkIdleTime();
                     continue;
                 }
-
 
 
                 int payloadLen = packetData.payload == null ? 0 : packetData.payload.length;
@@ -175,14 +141,12 @@ public class TCPSessionWorker {
 
     private void checkIdleTime() throws Exception {
         if (System.currentTimeMillis() - proxyConnection.lastActivityTime > 120000) {
-            proxyConnection.sendFin();
+            closeProxyConnection();
         }
     }
 
     private void closeAndCleanup() {
-        if (proxyConnection.closed) return;
-        proxyConnection.closed = true;
-        resetProxyConnection();
+        closeProxyConnection();
         closeRealConnection();
         cleanup.run();
     }
