@@ -91,18 +91,12 @@ public class TCPSessionWorker {
                     continue;
                 }
 
-
-                int payloadLen = packetData.payload == null ? 0 : packetData.payload.length;
-                if (payloadLen > 0) {
-                    realConnection.write(packetData.payload, 0, payloadLen);
-                    proxyConnection.expectedClientSeq += payloadLen;
+                if (packetData.hasPayload()) {
+                    realConnection.write(packetData.payload, 0, packetData.payload.length);
+                    proxyConnection.expectedClientSeq += packetData.payload.length;
                 }
 
-                if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
-                    proxyConnection.expectedClientSeq += 1;
-
-                    proxyConnection.sendPureAck();
-                } else if (payloadLen > 0 || packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
+                if (packetData.hasPayload() || packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
                     proxyConnection.sendPureAck();
                 }
             }

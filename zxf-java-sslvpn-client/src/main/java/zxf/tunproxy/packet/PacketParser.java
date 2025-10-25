@@ -351,6 +351,10 @@ public class PacketParser {
         public static final int ACK = 0x10;
         public static final int URG = 0x20;
 
+        public boolean hasPayload() {
+            return payload != null && payload.length > 0;
+        }
+
         public boolean hasFlag(int flag) {
             return (flags & flag) != 0;
         }
