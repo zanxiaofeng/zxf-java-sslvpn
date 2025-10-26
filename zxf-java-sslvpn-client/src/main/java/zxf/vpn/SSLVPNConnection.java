@@ -19,20 +19,28 @@ public class SSLVPNConnection implements AutoCloseable {
         this.sslSocket = sslSocket;
     }
 
-    public void write(byte[] buffer, int off, int len) throws IOException {
-        if (outputStream == null) {
-            outputStream = sslSocket.getOutputStream();
+    public void write(byte[] buffer) {
+        try {
+            if (outputStream == null) {
+                outputStream = sslSocket.getOutputStream();
+            }
+            outputStream.write(buffer, 0, buffer.length);
+            outputStream.flush();
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
         }
-        outputStream.write(buffer, off, len);
-        outputStream.flush();
     }
 
     public int read(byte[] buffer) throws IOException {
-        if (inputStream == null) {
-            inputStream = sslSocket.getInputStream();
-        }
+        try {
+            if (inputStream == null) {
+                inputStream = sslSocket.getInputStream();
+            }
 
-        return inputStream.read(buffer);
+            return inputStream.read(buffer);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     @Override

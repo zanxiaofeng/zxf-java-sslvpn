@@ -1,7 +1,6 @@
 package zxf.tunproxy.proxy.tcp;
 
 import lombok.extern.slf4j.Slf4j;
-import zxf.tunproxy.packet.PacketParser;
 import zxf.vpn.SSLVPNClient;
 import zxf.vpn.SSLVPNConnection;
 
@@ -33,7 +32,7 @@ public class TCPSessionWorker {
                 }
 
                 // 启动数据转发
-                startForwarding();
+                startDataForwarding();
             } catch (Exception ex) {
                 closeAndCleanup();
             }
@@ -71,7 +70,7 @@ public class TCPSessionWorker {
     /**
      * 启动数据转发
      */
-    private void startForwarding() {
+    private void startDataForwarding() {
         readThread.start();
         writeThread.start();
     }
@@ -85,20 +84,16 @@ public class TCPSessionWorker {
         try {
             log.info("=== 开始转发数据到真实连接 ===");
             while (!proxyConnection.closed) {
-                PacketParser.TCPPacket packetData = proxyConnection.waitForData();
-                if (packetData == null) {
-                    checkIdleTime();
-                    continue;
-                }
+                proxyConnection.waitForData((packetData) -> {
+                    if (packetData == null) {
+                        checkIdleTime();
+                        return;
+                    }
 
-                if (packetData.hasPayload()) {
-                    realConnection.write(packetData.payload, 0, packetData.payload.length);
-                    proxyConnection.expectedClientSeq += packetData.payload.length;
-                }
-
-                if (packetData.hasPayload() || packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
-                    proxyConnection.sendPureAck();
-                }
+                    if (packetData.hasPayload()) {
+                        realConnection.write(packetData.payload);
+                    }
+                });
             }
         } catch (Exception ex) {
             log.error("转发数据时发生错误: {}", ex.getMessage(), ex);
@@ -133,7 +128,7 @@ public class TCPSessionWorker {
     }
 
 
-    private void checkIdleTime() throws Exception {
+    private void checkIdleTime() {
         if (System.currentTimeMillis() - proxyConnection.lastActivityTime > 120000) {
             closeProxyConnection();
         }
