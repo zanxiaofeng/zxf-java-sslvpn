@@ -43,7 +43,7 @@ public class TestTunProxy {
 
                 byte[] data = LocalDateTime.now().toString().getBytes();
 
-                while (!Thread.currentThread().isInterrupted()) {
+                //while (!Thread.currentThread().isInterrupted()) {
                     clientOutput.writeInt(data.length);
                     clientOutput.write(data);
                     clientOutput.flush();
@@ -54,7 +54,7 @@ public class TestTunProxy {
                     System.out.println("Received: " + new String(dataR));
 
                     Thread.currentThread().sleep(30000);
-                }
+                //}
             } catch (IOException | InterruptedException e) {
                 // 连接关闭时正常结束
             } finally {

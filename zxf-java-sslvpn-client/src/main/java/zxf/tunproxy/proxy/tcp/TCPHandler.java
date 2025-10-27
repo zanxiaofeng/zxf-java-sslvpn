@@ -27,12 +27,12 @@ public class TCPHandler {
 
         TCPSession existing = activeSessions.get(sessionKey);
         if (existing != null) {
-            log.debug("会话已存在，提交数据包: {}", sessionKey);
+            //log.debug("会话已存在，提交数据包: {}", sessionKey);
             existing.submitPacket(tcpPacket);
             return;
         }
 
-        log.debug("会话不存在，创建新会话: {}", sessionKey);
+        //log.debug("会话不存在，创建新会话: {}", sessionKey);
         TCPSession tcpSession = new TCPSession(tcpPacket, tunProxy);
         tcpSession.start(() -> {
             activeSessions.remove(sessionKey);
