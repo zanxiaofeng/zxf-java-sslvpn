@@ -53,7 +53,7 @@ public class TestTunProxy {
                     clientInput.readFully(dataR);
                     System.out.println("Received: " + new String(dataR));
 
-                    Thread.currentThread().sleep(30000);
+                    Thread.currentThread().sleep(3000);
                 //}
             } catch (IOException | InterruptedException e) {
                 // 连接关闭时正常结束

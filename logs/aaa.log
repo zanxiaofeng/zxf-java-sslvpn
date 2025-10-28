@@ -1,42 +1,48 @@
 TUN 设备创建成功: tun-proxy
-TUN 设备配置成功: IP=10.8.0.1, Netmask=255.255.255.0 2025-10-27 20:02:40.545 - INFO  [main] zxf.tunproxy.tun.TunDeviceManager - 路由规则设置完成
-2025-10-27 20:02:40.547 - INFO  [main] zxf.tunproxy.proxy.TunProxy - === 基于 TUN 的代理服务器启动 ===
-2025-10-27 20:02:48.862 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 等待 SYN 包...
-2025-10-27 20:02:48.863 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 收到 SYN 包 TCP Packet: 10.8.0.1:51160 -> 113.137.54.1:8008 seq=2414247277 ack=0 flags=SYN size=0
-2025-10-27 20:02:48.864 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 发送 SYN-ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:51160 seq=633597606 ack=2414247278 flags=SYN ACK size=0
-2025-10-27 20:02:48.864 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 等待 ACK 包...
-2025-10-27 20:02:48.865 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 收到 有效ACK 包 TCP Packet: 10.8.0.1:51160 -> 113.137.54.1:8008 seq=2414247278 ack=633597607 flags=ACK size=0
-2025-10-27 20:02:48.865 - INFO  [tcp-session-worker-handshake] z.t.proxy.tcp.TCPSessionWorker - 建立真实连接: 113.137.54.1:8008 
-2025-10-27 20:02:49.096 - INFO  [tcp-session-worker-handshake] zxf.vpn.SSLVPNClient - SSL VPN client, Connected to SSL VPN gateway, /127.0.0.1:53910, localhost/127.0.0.1:8443, Session(1761566569042|TLS_AES_256_GCM_SHA384)
-2025-10-27 20:02:49.181 - INFO  [tcp-session-worker-reader] z.t.proxy.tcp.TCPSessionWorker - === 开始读取数据 ===
-2025-10-27 20:02:49.181 - INFO  [tcp-session-worker-writer] z.t.proxy.tcp.TCPSessionWorker - === 开始转发数据到真实连接 ===
-2025-10-27 20:02:49.182 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
-2025-10-27 20:02:49.182 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 DATA 包 TCP Packet: 10.8.0.1:51160 -> 113.137.54.1:8008 seq=2414247278 ack=633597607 flags=PSH ACK size=4
-2025-10-27 20:02:49.182 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - sendPureAck
-2025-10-27 20:02:49.182 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
-2025-10-27 20:02:49.182 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 无效ACK 包 TCP Packet: 10.8.0.1:51160 -> 113.137.54.1:8008 seq=2414247278 ack=633597607 flags=PSH ACK size=4
-2025-10-27 20:02:49.182 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
-2025-10-27 20:02:49.183 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 DATA 包 TCP Packet: 10.8.0.1:51160 -> 113.137.54.1:8008 seq=2414247282 ack=633597607 flags=PSH ACK size=29
-2025-10-27 20:02:49.183 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - sendPureAck
-2025-10-27 20:02:49.183 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
-2025-10-27 20:02:49.226 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 DATA 包 TCP Packet: 10.8.0.1:51160 -> 113.137.54.1:8008 seq=2414247311 ack=633597611 flags=ACK size=0
-2025-10-27 20:02:49.226 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - sendPureAck
-2025-10-27 20:02:49.226 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
-2025-10-27 20:02:49.267 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 DATA 包 TCP Packet: 10.8.0.1:51160 -> 113.137.54.1:8008 seq=2414247311 ack=633597640 flags=ACK size=0
-2025-10-27 20:02:49.267 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - sendPureAck
-2025-10-27 20:02:49.267 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
-2025-10-27 20:03:01.510 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 等待 SYN 包...
-2025-10-27 20:03:19.273 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 FIN 包 TCP Packet: 10.8.0.1:51160 -> 113.137.54.1:8008 seq=2414247311 ack=633597640 flags=FIN ACK size=0
-2025-10-27 20:03:19.273 - ERROR [tcp-session-worker-writer] z.t.proxy.tcp.TCPSessionWorker - 转发数据时发生错误: null
+TUN 设备配置成功: IP=10.8.0.1, Netmask=255.255.255.0 2025-10-28 08:20:41.884 - INFO  [main] zxf.tunproxy.tun.TunDeviceManager - 路由规则设置完成
+2025-10-28 08:20:41.885 - INFO  [main] zxf.tunproxy.proxy.TunProxy - === 基于 TUN 的代理服务器启动 ===
+2025-10-28 08:20:47.395 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 等待 SYN 包...
+2025-10-28 08:20:47.396 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 收到 SYN 包 TCP Packet: 10.8.0.1:47230 -> 113.137.54.1:8008 seq=2065772048 ack=0 flags=SYN size=0
+2025-10-28 08:20:47.397 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 3645462248,0
+2025-10-28 08:20:47.398 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 发送 SYN-ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:47230 seq=3645462248 ack=2065772049 flags=SYN ACK size=0
+2025-10-28 08:20:47.398 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 等待 ACK 包...
+2025-10-28 08:20:47.398 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 收到 有效ACK 包 TCP Packet: 10.8.0.1:47230 -> 113.137.54.1:8008 seq=2065772049 ack=3645462249 flags=ACK size=0
+2025-10-28 08:20:47.399 - INFO  [tcp-session-worker-handshake] z.t.proxy.tcp.TCPSessionWorker - 建立真实连接: 113.137.54.1:8008
+2025-10-28 08:20:47.656 - INFO  [tcp-session-worker-handshake] zxf.vpn.SSLVPNClient - SSL VPN client, Connected to SSL VPN gateway, /127.0.0.1:58470, localhost/127.0.0.1:8443, Session(1761610847581|TLS_AES_256_GCM_SHA384)
+2025-10-28 08:20:47.708 - INFO  [tcp-session-worker-reader] z.t.proxy.tcp.TCPSessionWorker - === 开始读取数据 ===
+2025-10-28 08:20:47.708 - INFO  [tcp-session-worker-writer] z.t.proxy.tcp.TCPSessionWorker - === 开始转发数据到真实连接 ===
+2025-10-28 08:20:47.708 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
+2025-10-28 08:20:47.708 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 DATA 包 TCP Packet: 10.8.0.1:47230 -> 113.137.54.1:8008 seq=2065772049 ack=3645462249 flags=PSH ACK size=4
+2025-10-28 08:20:47.709 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - sendPureAck
+2025-10-28 08:20:47.709 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 发送 Pure ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:47230 seq=3645462249 ack=2065772053 flags=ACK size=0
+2025-10-28 08:20:47.709 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
+2025-10-28 08:20:47.709 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 无效ACK 包 TCP Packet: 10.8.0.1:47230 -> 113.137.54.1:8008 seq=2065772049 ack=3645462249 flags=PSH ACK size=4
+2025-10-28 08:20:47.709 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
+2025-10-28 08:20:47.710 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 DATA 包 TCP Packet: 10.8.0.1:47230 -> 113.137.54.1:8008 seq=2065772053 ack=3645462249 flags=PSH ACK size=29
+2025-10-28 08:20:47.710 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - sendPureAck
+2025-10-28 08:20:47.710 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 发送 Pure ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:47230 seq=3645462249 ack=2065772082 flags=ACK size=0
+2025-10-28 08:20:47.710 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
+2025-10-28 08:20:47.751 - INFO  [tcp-session-worker-reader] zxf.tunproxy.proxy.tcp.TCPSession - 发送 DATA: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:47230 seq=3645462249 ack=2065772082 flags=PSH ACK size=4
+2025-10-28 08:20:47.752 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 DATA 包 TCP Packet: 10.8.0.1:47230 -> 113.137.54.1:8008 seq=2065772082 ack=3645462253 flags=ACK size=0
+2025-10-28 08:20:47.752 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - sendPureAck
+2025-10-28 08:20:47.752 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 发送 Pure ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:47230 seq=3645462253 ack=2065772082 flags=ACK size=0
+2025-10-28 08:20:47.752 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
+2025-10-28 08:20:47.792 - INFO  [tcp-session-worker-reader] zxf.tunproxy.proxy.tcp.TCPSession - 发送 DATA: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:47230 seq=3645462253 ack=2065772082 flags=PSH ACK size=29
+2025-10-28 08:20:47.793 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 DATA 包 TCP Packet: 10.8.0.1:47230 -> 113.137.54.1:8008 seq=2065772082 ack=3645462282 flags=ACK size=0
+2025-10-28 08:20:47.793 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - sendPureAck
+2025-10-28 08:20:47.793 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 发送 Pure ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:47230 seq=3645462282 ack=2065772082 flags=ACK size=0
+2025-10-28 08:20:47.793 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 DATA 包...
+2025-10-28 08:20:50.797 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 FIN 包 TCP Packet: 10.8.0.1:47230 -> 113.137.54.1:8008 seq=2065772082 ack=3645462282 flags=FIN ACK size=0
+2025-10-28 08:20:50.798 - ERROR [tcp-session-worker-writer] z.t.proxy.tcp.TCPSessionWorker - 转发数据时发生错误: null
 zxf.tunproxy.proxy.tcp.SessionException$SessionEndException: null
-	at zxf.tunproxy.proxy.tcp.TCPSession.waitForData(TCPSession.java:82)
+	at zxf.tunproxy.proxy.tcp.TCPSession.waitForData(TCPSession.java:83)
 	at zxf.tunproxy.proxy.tcp.TCPSessionWorker.writeToRealConnection(TCPSessionWorker.java:87)
 	at java.base/java.lang.Thread.run(Thread.java:1583)
-2025-10-27 20:03:19.277 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 发送 SYN-ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:51160 seq=633597640 ack=2414247311 flags=ACK size=0
-2025-10-27 20:03:19.277 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 发送 SYN-ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:51160 seq=633597641 ack=2414247311 flags=FIN size=0
-2025-10-27 20:03:19.277 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 ACK 包...
-2025-10-27 20:03:19.486 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 无效ACK 包 TCP Packet: 10.8.0.1:51160 -> 113.137.54.1:8008 seq=2414247311 ack=633597640 flags=FIN ACK size=0
-2025-10-27 20:03:19.491 - ERROR [tcp-session-worker-reader] z.t.proxy.tcp.TCPSessionWorker - 从真实连接读取数据失败: java.net.SocketException: Socket closed
+2025-10-28 08:20:50.799 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 发送 SYN-ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:47230 seq=3645462282 ack=2065772082 flags=ACK size=0
+2025-10-28 08:20:50.799 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 发送 SYN-ACK: TCP Packet: 113.137.54.1:8008 -> 10.8.0.1:47230 seq=3645462283 ack=2065772082 flags=FIN size=0
+2025-10-28 08:20:50.799 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 等待 ACK 包...
+2025-10-28 08:20:51.005 - INFO  [tcp-session-worker-writer] zxf.tunproxy.proxy.tcp.TCPSession - 收到 无效ACK 包 TCP Packet: 10.8.0.1:47230 -> 113.137.54.1:8008 seq=2065772082 ack=3645462282 flags=FIN ACK size=0, 3645462284, 2065772082
+2025-10-28 08:20:51.007 - ERROR [tcp-session-worker-reader] z.t.proxy.tcp.TCPSessionWorker - 从真实连接读取数据失败: java.net.SocketException: Socket closed
 java.lang.RuntimeException: java.net.SocketException: Socket closed
 	at zxf.vpn.SSLVPNConnection.read(SSLVPNConnection.java:42)
 	at zxf.tunproxy.proxy.tcp.TCPSessionWorker.readFromRealConnection(TCPSessionWorker.java:112)
@@ -55,4 +61,4 @@ Caused by: java.net.SocketException: Socket closed
 	at java.base/java.io.InputStream.read(InputStream.java:220)
 	at zxf.vpn.SSLVPNConnection.read(SSLVPNConnection.java:40)
 	... 2 common frames omitted
-2025-10-27 20:03:19.902 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 等待 SYN 包...
+2025-10-28 08:20:51.422 - INFO  [tcp-session-worker-handshake] zxf.tunproxy.proxy.tcp.TCPSession - 等待 SYN 包...

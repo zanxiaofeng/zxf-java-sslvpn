@@ -1,6 +1,7 @@
 package zxf.tunproxy.proxy.tcp;
 
 import lombok.extern.slf4j.Slf4j;
+import zxf.JavaUtils;
 import zxf.tunproxy.packet.PacketBuilder;
 import zxf.tunproxy.packet.PacketParser;
 import zxf.tunproxy.proxy.TunProxy;
@@ -100,6 +101,7 @@ public class TCPSession {
         byte flags = (byte) (PacketParser.TCPPacket.PSH | PacketParser.TCPPacket.ACK);
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
                 clientNextSeq, flags, serverWindow, payload);
+        log.info("发送 DATA: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)));
         tunProxy.submitPacket(packet);
         lastActivityTime = System.currentTimeMillis();
         serverNextSeq += payload.length;
@@ -109,6 +111,7 @@ public class TCPSession {
         byte flags = (byte) (PacketParser.TCPPacket.ACK);
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
                 clientNextSeq, flags, serverWindow, null);
+        log.info("发送 Pure ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)));
         tunProxy.submitPacket(packet);
     }
 
@@ -177,11 +180,12 @@ public class TCPSession {
     }
 
     private void sendSYNACK() throws Exception {
-        serverInitialSeq = ThreadLocalRandom.current().nextInt();
+        serverInitialSeq = JavaUtils.getUnsignedInt(ThreadLocalRandom.current().nextInt());
 
         byte flags = (byte) (PacketParser.TCPPacket.SYN | PacketParser.TCPPacket.ACK);
         byte[] responsePacket = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverInitialSeq, clientNextSeq, flags, serverWindow, null);
 
+        log.info("{},{}", serverInitialSeq, serverNextSeq);
         log.info("发送 SYN-ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(responsePacket, responsePacket.length)));
 
         tunProxy.submitPacket(responsePacket);
@@ -206,7 +210,7 @@ public class TCPSession {
             if (packetData == null) continue;
 
             if (packetData.ackNumber != serverNextSeq || packetData.sequenceNumber != clientNextSeq) {
-                log.info("收到 无效ACK 包 {}", packetData);
+                log.info("收到 无效ACK 包 {}, {}, {}", packetData, serverNextSeq, clientNextSeq);
                 return null;
             }
 
