@@ -29,6 +29,11 @@
 - sun.security.ssl.BaseSSLSocketImpl
 - sun.security.ssl.SSLSocketImpl
 
+# CURL -x|--proxy
+- curl -x <server:port> <target url>
+- curl -x <protocal://server:port> <target url>
+- http/https/socks5
+
 # SEQ & ACK
 - In TCP, the Sequence Number (SEQ) tracks the order of bytes sent by a host, ensuring data is received in the correct sequence. The Acknowledgement Number (ACK) is used by the receiver to tell the sender which bytes it expects next, based on the data it has already received. These two numbers coordinate the reliable, ordered transfer of data during a TCP connection.
 
