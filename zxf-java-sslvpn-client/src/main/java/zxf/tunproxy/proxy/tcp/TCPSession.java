@@ -142,11 +142,11 @@ public class TCPSession {
                 clientFINAcked = true;
                 waitForFIN();
                 clientFINAcked = true;
-                sendACK();
+                sendPureAck();
             }
 
             if (clientFINReceived && !serverFINSent) {
-                sendACK();
+                sendPureAck();
                 sendFin();
                 serverFINSent = true;
                 waitForACK();
@@ -190,16 +190,6 @@ public class TCPSession {
 
         tunProxy.submitPacket(responsePacket);
         serverNextSeq = serverInitialSeq + 1;
-    }
-
-    private void sendACK() throws Exception {
-        byte flags = (byte) (PacketParser.TCPPacket.ACK);
-        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq, clientNextSeq, flags, serverWindow, null);
-
-        log.info("发送 SYN-ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)));
-
-        tunProxy.submitPacket(packet);
-        serverNextSeq += 1;
     }
 
     private PacketParser.TCPPacket waitForACK() throws InterruptedException, SessionException.SessionResetException {
