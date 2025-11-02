@@ -60,6 +60,7 @@ public class TCPSession {
     public void waitForData(Consumer<PacketParser.TCPPacket> consumer) throws Exception {
         log.info("等待 DATA 包...");
         while (true) {
+
             PacketParser.TCPPacket packetData = packetQueue.poll(1000, TimeUnit.SECONDS);
             if (packetData == null) {
                 consumer.accept(packetData);
@@ -108,11 +109,11 @@ public class TCPSession {
         serverNextSeq.addAndGet(payload.length);
         tunProxy.submitPacket(packet, () -> {
             lastActivityTime = System.currentTimeMillis();
-            serverNextSeq.addAndGet(payload.length);
+            serverSentSeq.addAndGet(payload.length);
         });
     }
 
-    public void sendPureAck() throws Exception {
+    private void sendPureAck() throws Exception {
         byte flags = (byte) (PacketParser.TCPPacket.ACK);
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq.get(),
                 clientNextSeq.get(), flags, serverWindow, null);
