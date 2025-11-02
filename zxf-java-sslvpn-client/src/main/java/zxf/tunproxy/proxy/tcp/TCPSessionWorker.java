@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import zxf.vpn.SSLVPNClient;
 import zxf.vpn.SSLVPNConnection;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @Slf4j
 public class TCPSessionWorker {
     private final Thread readThread = new Thread(this::readFromRealConnection, "tcp-session-worker-reader");
@@ -19,24 +21,54 @@ public class TCPSessionWorker {
 
     public void start() {
         new Thread(() -> {
+            log.info("=== 开始处理 TCP 会话: {}:{} -> {}:{} ===", proxyConnection.srcIP, proxyConnection.srcPort, proxyConnection.dstIP, proxyConnection.dstPort);
+            AtomicBoolean proxyConnected = new AtomicBoolean(false);
+
+            AtomicBoolean realConnected = new AtomicBoolean(false);
+            Thread realConnectionThread = new Thread(() -> {
+                try {
+                    // 建立真实连接
+                    if (!establishRealConnection()) {
+                        return;
+                    }
+                    realConnected.set(true);
+                } catch (Exception ex) {
+                    log.error("建立真实连接失败: {}", ex.getMessage(), ex);
+                    closeAndCleanup();
+                }
+            }, "tcp-session-worker-real");
+            realConnectionThread.start();
+
+            Thread proxyConnectionThread = new Thread(() -> {
+                try {
+                    Thread.currentThread().sleep(1000);
+                    // 处理 TCP 握手
+                    if (!establishProxyConnection()) {
+                        return;
+                    }
+                    proxyConnected.set(true);
+                } catch (Exception ex) {
+                    log.error("建立代理连接失败: {}", ex.getMessage(), ex);
+                    closeAndCleanup();
+                }
+            }, "tcp-session-worker-proxy");
+            proxyConnectionThread.start();
+
             try {
-                // 处理 TCP 握手
-                if (!establishProxyConnection()) {
-                    return;
-                }
+                log.info("=== 等待代理连接和真实连接建立 ===");
+                realConnectionThread.join();
+                proxyConnectionThread.join();
 
-                // 建立真实连接
-                if (!establishRealConnection()) {
-                    closeProxyConnection();
-                    return;
+                if (proxyConnected.get() && realConnected.get()) {
+                    log.info("=== 代理连接和真实连接都已建立 ===");
+                    // 启动数据转发
+                    startDataForwarding();
                 }
-
-                // 启动数据转发
-                startDataForwarding();
-            } catch (Exception ex) {
-                closeAndCleanup();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-        }, "tcp-session-worker-handshake").start();
+
+        }).start();
     }
 
 
@@ -90,9 +122,7 @@ public class TCPSessionWorker {
                         return;
                     }
 
-                    if (packetData.hasPayload()) {
-                        realConnection.write(packetData.payload);
-                    }
+                    realConnection.write(packetData.payload);
                 });
             }
         } catch (Exception ex) {

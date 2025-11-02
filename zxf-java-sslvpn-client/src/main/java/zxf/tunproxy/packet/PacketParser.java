@@ -372,7 +372,7 @@ public class PacketParser {
 
         @Override
         public String toString() {
-            return String.format("TCP Packet: %s:%d -> %s:%d seq=%d ack=%d flags=%s size=%d", ipPacket.srcIP, srcPort, ipPacket.dstIP, dstPort, sequenceNumber, ackNumber, getFlagsString(), payload == null ? 0 : payload.length);
+            return String.format("TCP Packet: %s:%d -> %s:%d seq=%d ack=%d window= %d, flags=%s size=%d", ipPacket.srcIP, srcPort, ipPacket.dstIP, dstPort, sequenceNumber, ackNumber, windowSize, getFlagsString(), payload == null ? 0 : payload.length);
         }
     }
 

@@ -59,40 +59,43 @@ public class TCPSession {
 
     public void waitForData(Consumer<PacketParser.TCPPacket> consumer) throws Exception {
         log.info("等待 DATA 包...");
-        PacketParser.TCPPacket packetData = packetQueue.poll(1000, TimeUnit.SECONDS);
-        if (packetData == null) {
-            consumer.accept(packetData);
-            return;
-        }
+        while (true) {
+            PacketParser.TCPPacket packetData = packetQueue.poll(1000, TimeUnit.SECONDS);
+            if (packetData == null) {
+                consumer.accept(packetData);
+                return;
+            }
 
-        if (packetData.ackNumber != serverNextSeq || packetData.sequenceNumber != clientNextSeq) {
-            log.info("收到 无效ACK 包 {}", packetData);
-            //sendPureAck();
-            //waitForData(consumer);
-            return;
-        }
+            if (packetData.ackNumber != serverNextSeq || packetData.sequenceNumber != clientNextSeq) {
+                log.info("收到 无效 包 {}, {}, {}", packetData, serverNextSeq, clientNextSeq);
+                continue;
+            }
 
-        if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
-            log.info("收到 RST 包 {}", packetData);
-            throw new SessionException.SessionResetException();
-        }
+            if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
+                log.info("收到 RST 包 {}", packetData);
+                throw new SessionException.SessionResetException();
+            }
 
-        if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
-            clientFINReceived = true;
-            log.info("收到 FIN 包 {}", packetData);
-            throw new SessionException.SessionEndException();
-        }
+            if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
+                clientFINReceived = true;
+                log.info("收到 FIN 包 {}", packetData);
+                throw new SessionException.SessionEndException();
+            }
 
-        log.info("收到 DATA 包 {}", packetData);
-        consumer.accept(packetData);
+            if (packetData.flags == PacketParser.TCPPacket.ACK) {
+                log.info("收到 ACK 包 {}", packetData);
+                continue;
+            }
 
-        if (packetData.hasPayload()) {
-            clientNextSeq += packetData.payload.length;
-        }
+            if (packetData.hasPayload()) {
+                log.info("收到 DATA 包 {}", packetData);
+                consumer.accept(packetData);
 
-        if (packetData.hasPayload() || packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
-            log.info("sendPureAck");
-            sendPureAck();
+                clientNextSeq += packetData.payload.length;
+                sendPureAck();
+
+                return;
+            }
         }
     }
 
