@@ -15,6 +15,7 @@ zxf/tunproxy/packet/PacketParser$UDPHeader.class
 zxf/tunproxy/jna/TunDevice$IfReqFlags.class
 zxf/tunproxy/packet/PacketBuilder.class
 zxf/tunproxy/jna/TunDevice$SockAddrIn.class
+zxf/tunproxy/proxy/tcp/Tuple.class
 zxf/tunproxy/ProxyServer.class
 zxf/socks/AuthenticatedSocks5Handler.class
 zxf/tunproxy/packet/PacketParser.class

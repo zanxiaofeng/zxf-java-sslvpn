@@ -10,6 +10,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -23,10 +24,9 @@ public class TCPSession {
 
     private final TunProxy tunProxy;
 
-    private volatile long clientInitialSeq;
-    private volatile long clientNextSeq;
-    private volatile long serverInitialSeq;
-    private volatile long serverNextSeq;
+    private volatile AtomicLong clientNextSeq;
+    private volatile AtomicLong serverNextSeq;
+    private volatile AtomicLong serverSentSeq;
     private volatile int serverWindow = 65525;
 
     private volatile boolean clientRSTReceived = false;
@@ -66,32 +66,32 @@ public class TCPSession {
                 return;
             }
 
-            if (packetData.ackNumber != serverNextSeq || packetData.sequenceNumber != clientNextSeq) {
-                log.info("收到 无效 包 {}, {}, {}", packetData, serverNextSeq, clientNextSeq);
+            if (packetData.ackNumber != serverSentSeq.get() || packetData.sequenceNumber != clientNextSeq.get()) {
+                log.info("收到 无效 包 {}, {}, {}", packetData, clientNextSeq, serverSentSeq);
                 continue;
             }
 
             if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
-                log.info("收到 RST 包 {}", packetData);
+                log.info("收到 RST 包 {}, {}, {}", packetData, clientNextSeq, serverSentSeq);
                 throw new SessionException.SessionResetException();
             }
 
             if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
                 clientFINReceived = true;
-                log.info("收到 FIN 包 {}", packetData);
+                log.info("收到 FIN 包 {}, {}, {}", packetData, clientNextSeq, serverSentSeq);
                 throw new SessionException.SessionEndException();
             }
 
             if (packetData.flags == PacketParser.TCPPacket.ACK) {
-                log.info("收到 ACK 包 {}", packetData);
+                log.info("收到 ACK 包 {}, {}, {}", packetData, clientNextSeq, serverSentSeq);
                 continue;
             }
 
             if (packetData.hasPayload()) {
-                log.info("收到 DATA 包 {}", packetData);
+                log.info("收到 DATA 包 {}, {}, {}", packetData, clientNextSeq, serverSentSeq);
                 consumer.accept(packetData);
 
-                clientNextSeq += packetData.payload.length;
+                clientNextSeq.addAndGet(packetData.payload.length);
                 sendPureAck();
 
                 return;
@@ -102,20 +102,23 @@ public class TCPSession {
     public void sendData(byte[] payload) throws Exception {
         if (payload == null || payload.length == 0) return;
         byte flags = (byte) (PacketParser.TCPPacket.PSH | PacketParser.TCPPacket.ACK);
-        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
-                clientNextSeq, flags, serverWindow, payload);
-        log.info("发送 DATA: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)));
-        tunProxy.submitPacket(packet);
-        lastActivityTime = System.currentTimeMillis();
-        serverNextSeq += payload.length;
+        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq.get(),
+                clientNextSeq.get(), flags, serverWindow, payload);
+        log.info("发送 DATA: {}, {}, {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)), serverNextSeq, clientNextSeq);
+        serverNextSeq.addAndGet(payload.length);
+        tunProxy.submitPacket(packet, () -> {
+            lastActivityTime = System.currentTimeMillis();
+            serverNextSeq.addAndGet(payload.length);
+        });
     }
 
     public void sendPureAck() throws Exception {
         byte flags = (byte) (PacketParser.TCPPacket.ACK);
-        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
-                clientNextSeq, flags, serverWindow, null);
-        log.info("发送 Pure ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)));
-        tunProxy.submitPacket(packet);
+        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq.get(),
+                clientNextSeq.get(), flags, serverWindow, null);
+        log.info("发送 Pure ACK: {}, {}, {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)), serverNextSeq, clientNextSeq);
+        tunProxy.submitPacket(packet, () -> {
+        });
     }
 
     public Boolean startSession() throws Exception {
@@ -168,14 +171,13 @@ public class TCPSession {
             if (packetData == null) continue;
             if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
                 clientRSTReceived = true;
-                log.info("收到 RST 包 {}", packetData);
+                log.info("收到 RST 包 {}, {}, {}", packetData, serverSentSeq, serverNextSeq);
                 throw new SessionException.SessionResetException();
             }
             if (packetData.hasFlag(PacketParser.TCPPacket.SYN) & !packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
                 // 更新状态
-                clientInitialSeq = packetData.sequenceNumber;
-                clientNextSeq = clientInitialSeq + 1;
-                log.info("收到 SYN 包 {}", packetData);
+                clientNextSeq = new AtomicLong(packetData.sequenceNumber + 1);
+                log.info("收到 SYN 包 {}, {}, {}", packetData, serverSentSeq, serverNextSeq);
                 return packetData;
             }
         }
@@ -183,16 +185,18 @@ public class TCPSession {
     }
 
     private void sendSYNACK() throws Exception {
-        serverInitialSeq = JavaUtils.getUnsignedInt(ThreadLocalRandom.current().nextInt());
+        serverNextSeq = new AtomicLong(JavaUtils.getUnsignedInt(ThreadLocalRandom.current().nextInt()));
+        serverSentSeq = new AtomicLong(serverNextSeq.get());
 
         byte flags = (byte) (PacketParser.TCPPacket.SYN | PacketParser.TCPPacket.ACK);
-        byte[] responsePacket = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverInitialSeq, clientNextSeq, flags, serverWindow, null);
+        byte[] responsePacket = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq.get(), clientNextSeq.get(), flags, serverWindow, null);
 
-        log.info("{},{}", serverInitialSeq, serverNextSeq);
-        log.info("发送 SYN-ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(responsePacket, responsePacket.length)));
+        log.info("发送 SYN-ACK: {}, {}, {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(responsePacket, responsePacket.length)), serverNextSeq, clientNextSeq);
 
-        tunProxy.submitPacket(responsePacket);
-        serverNextSeq = serverInitialSeq + 1;
+        serverNextSeq.addAndGet(1);
+        tunProxy.submitPacket(responsePacket, () -> {
+            serverSentSeq.addAndGet(1);
+        });
     }
 
     private PacketParser.TCPPacket waitForACK() throws InterruptedException, SessionException.SessionResetException {
@@ -202,19 +206,19 @@ public class TCPSession {
             PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
             if (packetData == null) continue;
 
-            if (packetData.ackNumber != serverNextSeq || packetData.sequenceNumber != clientNextSeq) {
-                log.info("收到 无效ACK 包 {}, {}, {}", packetData, serverNextSeq, clientNextSeq);
+            if (packetData.ackNumber != serverSentSeq.get() || packetData.sequenceNumber != clientNextSeq.get()) {
+                log.info("收到 无效ACK 包 {}, {}, {}", packetData, serverSentSeq, serverSentSeq);
                 return null;
             }
 
             if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
                 clientRSTReceived = true;
-                log.info("收到 RST 包 {}", packetData);
+                log.info("收到 RST 包 {}, {}, {}", packetData, serverSentSeq, serverSentSeq);
                 throw new SessionException.SessionResetException();
             }
 
             if (packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
-                log.info("收到 有效ACK 包 {}", packetData);
+                log.info("收到 有效ACK 包 {}, {}, {}", packetData, serverSentSeq, serverSentSeq);
                 return packetData;
             }
         }
@@ -228,19 +232,19 @@ public class TCPSession {
             PacketParser.TCPPacket packetData = packetQueue.poll(100, TimeUnit.MILLISECONDS);
             if (packetData == null) continue;
 
-            if (packetData.ackNumber != serverNextSeq || packetData.sequenceNumber != clientNextSeq) {
-                log.info("收到 无效包 {}", packetData);
+            if (packetData.ackNumber != serverSentSeq.get() || packetData.sequenceNumber != clientNextSeq.get()) {
+                log.info("收到 无效包 {}, {}, {}", packetData, serverSentSeq, serverNextSeq);
                 return null;
             }
 
             if (packetData.hasFlag(PacketParser.TCPPacket.RST)) {
                 clientRSTReceived = true;
-                log.info("收到 RST 包 {}", packetData);
+                log.info("收到 RST 包 {}, {}, {}", packetData, serverSentSeq, serverSentSeq);
                 throw new SessionException.SessionResetException();
             }
 
             if (packetData.hasFlag(PacketParser.TCPPacket.FIN)) {
-                log.info("收到 有效FIN 包 {}", packetData);
+                log.info("收到 有效FIN 包 {}, {}, {}", packetData, serverSentSeq, serverSentSeq);
                 return packetData;
             }
         }
@@ -250,23 +254,26 @@ public class TCPSession {
 
     private void sendFin() throws Exception {
         byte flags = (byte) (PacketParser.TCPPacket.FIN);
-        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
-                clientNextSeq, flags, serverWindow, null);
+        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq.get(),
+                clientNextSeq.get(), flags, serverWindow, null);
 
-        log.info("发送 SYN-ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)));
+        log.info("发送 SYN-ACK: {}, {}, {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)), serverNextSeq, clientNextSeq);
 
-        tunProxy.submitPacket(packet);
-        serverNextSeq += 1;
-        serverFINSent = true;
+        serverNextSeq.addAndGet(1);
+        tunProxy.submitPacket(packet, () -> {
+            serverSentSeq.addAndGet(1);
+            serverFINSent = true;
+        });
     }
 
     private void sendRST() throws Exception {
         byte flags = (byte) (PacketParser.TCPPacket.RST | PacketParser.TCPPacket.ACK);
-        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq,
-                clientNextSeq, flags, 0, null);
+        byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq.get(),
+                clientNextSeq.get(), flags, 0, null);
 
-        log.info("发送 SYN-ACK: {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)));
+        log.info("发送 SYN-ACK: {}, {}, {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)), serverNextSeq, clientNextSeq);
 
-        tunProxy.submitPacket(packet);
+        tunProxy.submitPacket(packet, () -> {
+        });
     }
 }

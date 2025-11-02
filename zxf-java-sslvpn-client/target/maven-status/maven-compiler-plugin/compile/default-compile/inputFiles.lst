@@ -11,6 +11,7 @@
 /home/davis/Work/zxf-java-sslvpn/zxf-java-sslvpn-client/src/main/java/zxf/tunproxy/proxy/tcp/TCPHandler.java
 /home/davis/Work/zxf-java-sslvpn/zxf-java-sslvpn-client/src/main/java/zxf/tunproxy/proxy/tcp/TCPSession.java
 /home/davis/Work/zxf-java-sslvpn/zxf-java-sslvpn-client/src/main/java/zxf/tunproxy/proxy/tcp/TCPSessionWorker.java
+/home/davis/Work/zxf-java-sslvpn/zxf-java-sslvpn-client/src/main/java/zxf/tunproxy/proxy/tcp/Tuple.java
 /home/davis/Work/zxf-java-sslvpn/zxf-java-sslvpn-client/src/main/java/zxf/tunproxy/proxy/udp/UDPHandler.java
 /home/davis/Work/zxf-java-sslvpn/zxf-java-sslvpn-client/src/main/java/zxf/tunproxy/tun/TunDeviceManager.java
 /home/davis/Work/zxf-java-sslvpn/zxf-java-sslvpn-client/src/main/java/zxf/vpn/SSLVPNClient.java

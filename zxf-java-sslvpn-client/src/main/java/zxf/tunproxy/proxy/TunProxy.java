@@ -4,14 +4,16 @@ import lombok.extern.slf4j.Slf4j;
 import zxf.tunproxy.jna.TunDevice;
 import zxf.tunproxy.packet.PacketParser;
 import zxf.tunproxy.proxy.tcp.TCPHandler;
+import zxf.tunproxy.proxy.tcp.Tuple;
 import zxf.tunproxy.tun.TunDeviceManager;
 
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 @Slf4j
 public class TunProxy implements AutoCloseable {
-    private final BlockingQueue<byte[]> packetQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<Tuple<byte[], Runnable>> packetQueue = new LinkedBlockingQueue<>();
     private final Thread readerThread = new Thread(this::readLoop, "tun-proxy-reader");
     private final Thread writerThread = new Thread(this::writeLoop, "tun-proxy-writer");
     private final int tunFd;
@@ -48,8 +50,8 @@ public class TunProxy implements AutoCloseable {
     }
 
 
-    public void submitPacket(byte[] packet) throws Exception {
-        packetQueue.put(packet);
+    public void submitPacket(byte[] packet, Runnable notify) throws Exception {
+        packetQueue.put(new Tuple<>(packet, notify));
     }
 
     /**
@@ -92,8 +94,11 @@ public class TunProxy implements AutoCloseable {
     private void writeLoop() {
         while (true) {
             try {
-                byte[] packet = packetQueue.take();
-                writePacket(packet);
+                Tuple<byte[], Runnable> packet = packetQueue.take();
+                writePacket(packet.first());
+                if (packet.second() != null) {
+                    packet.second().run();
+                }
             } catch (InterruptedException ex) {
                 break;
             } catch (Exception ex) {
