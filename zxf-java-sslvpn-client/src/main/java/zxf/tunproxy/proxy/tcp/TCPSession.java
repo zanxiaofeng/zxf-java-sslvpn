@@ -24,9 +24,9 @@ public class TCPSession {
 
     private final TunProxy tunProxy;
 
-    private volatile AtomicLong clientNextSeq;
-    private volatile AtomicLong serverNextSeq;
-    private volatile AtomicLong serverSentSeq;
+    private final AtomicLong clientNextSeq = new AtomicLong(0);
+    private final AtomicLong serverNextSeq = new AtomicLong(0);
+    private final AtomicLong serverSentSeq = new AtomicLong(0);
     private volatile int serverWindow = 65525;
 
     private volatile boolean clientRSTReceived = false;
@@ -61,7 +61,7 @@ public class TCPSession {
         log.info("等待 DATA 包...");
         while (true) {
 
-            PacketParser.TCPPacket packetData = packetQueue.poll(1000, TimeUnit.SECONDS);
+            PacketParser.TCPPacket packetData = packetQueue.poll(30, TimeUnit.SECONDS);
             if (packetData == null) {
                 consumer.accept(packetData);
                 return;
@@ -175,9 +175,9 @@ public class TCPSession {
                 log.info("收到 RST 包 {}, {}, {}", packetData, serverSentSeq, serverNextSeq);
                 throw new SessionException.SessionResetException();
             }
-            if (packetData.hasFlag(PacketParser.TCPPacket.SYN) & !packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
+            if (packetData.hasFlag(PacketParser.TCPPacket.SYN) && !packetData.hasFlag(PacketParser.TCPPacket.ACK)) {
                 // 更新状态
-                clientNextSeq = new AtomicLong(packetData.sequenceNumber + 1);
+                clientNextSeq.set(packetData.sequenceNumber + 1);
                 log.info("收到 SYN 包 {}, {}, {}", packetData, serverSentSeq, serverNextSeq);
                 return packetData;
             }
@@ -186,8 +186,9 @@ public class TCPSession {
     }
 
     private void sendSYNACK() throws Exception {
-        serverNextSeq = new AtomicLong(JavaUtils.getUnsignedInt(ThreadLocalRandom.current().nextInt()));
-        serverSentSeq = new AtomicLong(serverNextSeq.get());
+        long initialSeq = JavaUtils.getUnsignedInt(ThreadLocalRandom.current().nextInt());
+        serverNextSeq.set(initialSeq);
+        serverSentSeq.set(initialSeq);
 
         byte flags = (byte) (PacketParser.TCPPacket.SYN | PacketParser.TCPPacket.ACK);
         byte[] responsePacket = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq.get(), clientNextSeq.get(), flags, serverWindow, null);
@@ -258,7 +259,7 @@ public class TCPSession {
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq.get(),
                 clientNextSeq.get(), flags, serverWindow, null);
 
-        log.info("发送 SYN-ACK: {}, {}, {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)), serverNextSeq, clientNextSeq);
+        log.info("发送 FIN: {}, {}, {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)), serverNextSeq, clientNextSeq);
 
         serverNextSeq.addAndGet(1);
         tunProxy.submitPacket(packet, () -> {
@@ -272,7 +273,7 @@ public class TCPSession {
         byte[] packet = PacketBuilder.createTCPPacket(dstIP, srcIP, dstPort, srcPort, serverNextSeq.get(),
                 clientNextSeq.get(), flags, 0, null);
 
-        log.info("发送 SYN-ACK: {}, {}, {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)), serverNextSeq, clientNextSeq);
+        log.info("发送 RST: {}, {}, {}", PacketParser.parseTCPPacket(PacketParser.parseIPPacket(packet, packet.length)), serverNextSeq, clientNextSeq);
 
         tunProxy.submitPacket(packet, () -> {
         });

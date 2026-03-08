@@ -29,6 +29,7 @@ public class SocketUtils {
     }
 
     public static void closeQuietly(Socket socket) {
+        if (socket == null) return;
         try {
             socket.close();
         } catch (IOException e) {

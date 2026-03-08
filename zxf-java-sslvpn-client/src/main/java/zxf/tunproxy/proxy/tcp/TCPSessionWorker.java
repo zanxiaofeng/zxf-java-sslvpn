@@ -41,7 +41,7 @@ public class TCPSessionWorker {
 
             Thread proxyConnectionThread = new Thread(() -> {
                 try {
-                    Thread.currentThread().sleep(1000);
+                    Thread.sleep(1000);
                     // 处理 TCP 握手
                     if (!establishProxyConnection()) {
                         return;
@@ -86,16 +86,18 @@ public class TCPSessionWorker {
             realConnection = SSLVPNClient.connectToVPNServer("127.0.0.1", proxyConnection.dstPort);
             return true;
         } catch (Exception e) {
-            System.err.printf("建立真实连接失败: %s ", e.getMessage());
+            log.error("建立真实连接失败: {}", e.getMessage(), e);
             return false;
         }
     }
 
     private void closeRealConnection() {
         try {
-            realConnection.close();
+            if (realConnection != null) {
+                realConnection.close();
+            }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.warn("关闭真实连接失败: {}", e.getMessage());
         }
     }
 

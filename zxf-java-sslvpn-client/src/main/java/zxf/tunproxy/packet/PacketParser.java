@@ -23,7 +23,7 @@ public class PacketParser {
         } else if (version == 6) {
             return parseIPv6Packet(packet, length);
         } else {
-            System.err.println("不支持的 IP 版本: " + version);
+            //不支持的 IP 版本
             return null;
         }
     }
@@ -166,7 +166,7 @@ public class PacketParser {
      */
     private static IPPacket parseIPv6Packet(byte[] packet, int length) {
         if (length < IPV6_HEADER_LENGTH) {
-            System.err.println("IPv6 数据包长度不足");
+            //IPv6 数据包长度不足
             return null;
         }
 
@@ -179,7 +179,7 @@ public class PacketParser {
         ipPacket.flowLabel = ((packet[1] & 0x0F) << 16) | ((packet[2] & 0xFF) << 8) | (packet[3] & 0xFF);
 
         // 载荷长度
-        ipPacket.totalLength = ((packet[4] & 0xFF) << 8) | (packet[5] & 0xFF) + IPV6_HEADER_LENGTH;
+        ipPacket.totalLength = (((packet[4] & 0xFF) << 8) | (packet[5] & 0xFF)) + IPV6_HEADER_LENGTH;
 
         // 下一个头和跳数限制
         ipPacket.protocol = packet[6] & 0xFF;

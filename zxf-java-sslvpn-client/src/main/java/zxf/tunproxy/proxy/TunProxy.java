@@ -38,7 +38,7 @@ public class TunProxy implements AutoCloseable {
     }
 
     public void close() throws Exception {
-        if (tunFd > 0) {
+        if (tunFd >= 0) {
             TunDeviceManager.cleanupRouteAndCloseTunDevice(tunFd);
         }
 

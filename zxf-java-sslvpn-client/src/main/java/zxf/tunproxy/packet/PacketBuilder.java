@@ -1,12 +1,11 @@
 package zxf.tunproxy.packet;
 
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 数据包构造器 - 用于创建各种类型的 IP 数据包
  */
 public class PacketBuilder {
-    private static final Random random = new Random();
 
     /**
      * 创建 IPv4 数据包
@@ -27,7 +26,7 @@ public class PacketBuilder {
         ipHeader[3] = (byte) (totalLength & 0xFF);
 
         // 标识
-        int identification = random.nextInt(0xFFFF);
+        int identification = ThreadLocalRandom.current().nextInt(0xFFFF);
         ipHeader[4] = (byte) ((identification >> 8) & 0xFF);
         ipHeader[5] = (byte) (identification & 0xFF);
 

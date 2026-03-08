@@ -34,10 +34,10 @@ public class TCPHandler {
 
         //log.debug("会话不存在，创建新会话: {}", sessionKey);
         TCPSession tcpSession = new TCPSession(tcpPacket, tunProxy);
+        activeSessions.put(sessionKey, tcpSession);
         tcpSession.start(() -> {
             activeSessions.remove(sessionKey);
         });
-        activeSessions.put(sessionKey, tcpSession);
     }
 
     /**

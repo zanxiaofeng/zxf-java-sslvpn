@@ -12,18 +12,17 @@ import java.io.OutputStream;
 public class SSLVPNConnection implements AutoCloseable {
     @Getter
     private final SSLSocket sslSocket;
-    private volatile InputStream inputStream;
-    private volatile OutputStream outputStream;
+    private final InputStream inputStream;
+    private final OutputStream outputStream;
 
-    public SSLVPNConnection(SSLSocket sslSocket) {
+    public SSLVPNConnection(SSLSocket sslSocket) throws IOException {
         this.sslSocket = sslSocket;
+        this.inputStream = sslSocket.getInputStream();
+        this.outputStream = sslSocket.getOutputStream();
     }
 
     public void write(byte[] buffer) {
         try {
-            if (outputStream == null) {
-                outputStream = sslSocket.getOutputStream();
-            }
             outputStream.write(buffer, 0, buffer.length);
             outputStream.flush();
         } catch (Exception ex) {
@@ -32,15 +31,7 @@ public class SSLVPNConnection implements AutoCloseable {
     }
 
     public int read(byte[] buffer) throws IOException {
-        try {
-            if (inputStream == null) {
-                inputStream = sslSocket.getInputStream();
-            }
-
-            return inputStream.read(buffer);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
+        return inputStream.read(buffer);
     }
 
     @Override

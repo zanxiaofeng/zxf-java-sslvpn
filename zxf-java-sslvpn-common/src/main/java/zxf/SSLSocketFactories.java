@@ -25,60 +25,50 @@ public class SSLSocketFactories {
         if (sslServerSocketFactory != null) {
             return sslServerSocketFactory;
         }
-        // 启用 SSL 调试日志
-        //System.setProperty("javax.net.debug", "all");
-
-        //Key-Store
-        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        try (InputStream trustStoreInputStream = SSLSocketFactories.class.getClassLoader().getResourceAsStream(SERVER_KEY_STORE_PATH)) {
-            KeyStore keyStore = KeyStore.getInstance("JKS");
-            keyStore.load(trustStoreInputStream, SERVER_KEY_STORE_PASS_PHRASE.toCharArray());
-            keyManagerFactory.init(keyStore, SERVER_KEY_STORE_PASS_PHRASE.toCharArray());
+        synchronized (SSLSocketFactories.class) {
+            if (sslServerSocketFactory != null) {
+                return sslServerSocketFactory;
+            }
+            SSLContext sslContext = createSSLContext(SERVER_KEY_STORE_PATH, SERVER_KEY_STORE_PASS_PHRASE,
+                    SERVER_TRUST_STORE_PATH, SERVER_TRUST_STORE_PASS_PHRASE);
+            sslServerSocketFactory = sslContext.getServerSocketFactory();
+            return sslServerSocketFactory;
         }
-
-        //Trust-Store
-        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        try (InputStream trustStoreInputStream = SSLSocketFactories.class.getClassLoader().getResourceAsStream(SERVER_TRUST_STORE_PATH)) {
-            KeyStore trustStore = KeyStore.getInstance("JKS");
-            trustStore.load(trustStoreInputStream, SERVER_TRUST_STORE_PASS_PHRASE.toCharArray());
-            trustManagerFactory.init(trustStore);
-        }
-
-        SSLContext sslContext = SSLContext.getInstance("SSL");
-        sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
-
-        sslServerSocketFactory = sslContext.getServerSocketFactory();
-        return sslServerSocketFactory;
     }
 
     public static SSLSocketFactory sslSocketFactory() throws Exception {
         if (sslSocketFactory != null) {
             return sslSocketFactory;
         }
+        synchronized (SSLSocketFactories.class) {
+            if (sslSocketFactory != null) {
+                return sslSocketFactory;
+            }
+            SSLContext sslContext = createSSLContext(CLIENT_KEY_STORE_PATH, CLIENT_KEY_STORE_PASS_PHRASE,
+                    CLIENT_TRUST_STORE_PATH, CLIENT_TRUST_STORE_PASS_PHRASE);
+            sslSocketFactory = sslContext.getSocketFactory();
+            return sslSocketFactory;
+        }
+    }
 
-        // 启用 SSL 调试日志
-        //System.setProperty("javax.net.debug", "all");
-
-        //Key-Store
+    private static SSLContext createSSLContext(String keyStorePath, String keyStorePass,
+                                               String trustStorePath, String trustStorePass) throws Exception {
         KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        try (InputStream trustStoreInputStream = SSLSocketFactories.class.getClassLoader().getResourceAsStream(CLIENT_KEY_STORE_PATH)) {
+        try (InputStream keyStoreInputStream = SSLSocketFactories.class.getClassLoader().getResourceAsStream(keyStorePath)) {
             KeyStore keyStore = KeyStore.getInstance("JKS");
-            keyStore.load(trustStoreInputStream, CLIENT_KEY_STORE_PASS_PHRASE.toCharArray());
-            keyManagerFactory.init(keyStore, CLIENT_KEY_STORE_PASS_PHRASE.toCharArray());
+            keyStore.load(keyStoreInputStream, keyStorePass.toCharArray());
+            keyManagerFactory.init(keyStore, keyStorePass.toCharArray());
         }
 
-        //Trust-Store
         TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        try (InputStream trustStoreInputStream = SSLSocketFactories.class.getClassLoader().getResourceAsStream(CLIENT_TRUST_STORE_PATH)) {
+        try (InputStream trustStoreInputStream = SSLSocketFactories.class.getClassLoader().getResourceAsStream(trustStorePath)) {
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            trustStore.load(trustStoreInputStream, CLIENT_TRUST_STORE_PASS_PHRASE.toCharArray());
+            trustStore.load(trustStoreInputStream, trustStorePass.toCharArray());
             trustManagerFactory.init(trustStore);
         }
 
         SSLContext sslContext = SSLContext.getInstance("SSL");
         sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
-
-        sslSocketFactory = sslContext.getSocketFactory();
-        return sslSocketFactory;
+        return sslContext;
     }
 }
