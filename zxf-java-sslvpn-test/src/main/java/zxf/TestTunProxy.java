@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.net.URI;
 
 public class TestTunProxy {
     public static void main(String[] args) throws Exception {
@@ -20,8 +21,8 @@ public class TestTunProxy {
     }
 
     private static void testHttp() throws Exception {
-        // Open a connection using the proxy
-        URL url = new URL("https://www.sina.com");
+        // Open a connection using the proxy (using URI to avoid deprecated URL constructor)
+        URL url = URI.create("https://www.sina.com").toURL();
         URLConnection connection = url.openConnection();
 
         // Read data from the connection

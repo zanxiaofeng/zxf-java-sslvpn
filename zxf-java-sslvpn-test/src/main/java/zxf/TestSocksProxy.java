@@ -6,6 +6,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.net.URI;
 
 public class TestSocksProxy {
     public static void main(String[] args) throws Exception {
@@ -27,8 +28,8 @@ public class TestSocksProxy {
         // Create a SOCKS proxy object
         Proxy proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress("localhost", 1080));
 
-        // Open a connection using the proxy
-        URL url = new URL("https://www.sina.com");
+        // Open a connection using the proxy (using URI to avoid deprecated URL constructor)
+        URL url = URI.create("https://www.sina.com").toURL();
         URLConnection connection = url.openConnection(proxy);
 
         // Read data from the connection
